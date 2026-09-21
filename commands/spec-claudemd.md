@@ -1,54 +1,57 @@
 ---
-description: Distill PRD + ARCHITECTURE into a lean CLAUDE.md, at any project stage
-model: haiku
+description: Generate or refresh a lean CLAUDE.md from evidence in the repo
+model: sonnet
+allowed-tools: Read, Glob, Grep, Write, Edit, Bash(git ls-files:*), Bash(git log:*)
 ---
 
-ROLE: Technical writer who produces actionable developer reference docs
-TASK: Distill docs/PRD.md and docs/ARCHITECTURE.md into a lean CLAUDE.md
-CONTEXT: CLAUDE.md is loaded into every future Claude session for this project. It must be dense and actionable — not a summary of the docs. The docs are already referenced via @imports and will be read separately. CLAUDE.md may not exist yet, or may already exist from an earlier phase — detect which before writing.
-CONSTRAINTS: Do not duplicate content from PRD.md or ARCHITECTURE.md. Do not include feature descriptions, rationale, or aspirations. Reference the docs via @imports instead. Target under 150 lines.
+ROLE: Technical writer producing an actionable developer reference that is loaded into every future Claude session
+TASK: Create or update CLAUDE.md from what the repository actually contains
+CONTEXT: CLAUDE.md must be dense and actionable, not a summary. Evidence priority: existing CLAUDE.md (hand-written lines) > CI config (what really runs) > package manifests / Makefile / scripts > lint, format and type configs > README > sampled code. If docs/PRD.md or docs/ARCHITECTURE.md exist, import them; if not, do not mention them.
+CONSTRAINTS: Include only commands, conventions Claude would otherwise get wrong, and hard constraints. Every convention needs evidence: at least 2 code examples (file:line) or one enforcing config rule. No evidence means omit it or ask the user. Every command must be verified. No feature descriptions, rationale, or aspirations. Target under 150 lines.
 
-## Step 0 — Detect current state
-Check if CLAUDE.md already exists.
-- If it does, read it first. Preserve any hand-written conventions or constraints it has that still hold true — merge and update rather than blindly overwriting. Note in your output what changed.
-- If it doesn't, this is a fresh write.
+## Step 0 - Detect current state
+- Does CLAUDE.md exist? If yes, read it first. Preserve hand-written lines that still hold; merge rather than overwrite.
+- Do docs/PRD.md / docs/ARCHITECTURE.md exist? Note for the import lines.
 
-Read docs/PRD.md and docs/ARCHITECTURE.md.
+## Step 1 - Gather evidence
+- Commands: install, build, dev/run, lint, format, typecheck, test (all), test (single file), test (single test), coverage. CI config is the source of truth for what really runs.
+- Test layout: where tests live, naming, fixtures/helpers, mocking style, unit vs integration split, how services (DB etc.) are provided.
+- Conventions: naming, file placement, layering (from imports / boundary lint rules), error-handling and logging patterns.
+- Hard constraints: generated files never hand-edited, migration rules, protected dirs, secrets handling.
+Sample at least 3 files per area before claiming a convention. If two competing conventions exist in the code, ask the user which is the target.
 
-## Rules for CLAUDE.md content
-Include ONLY:
-- Commands — exact shell commands, copy-paste ready, for whichever of build/test/lint/dev-server/run/install actually apply to the chosen stack. Skip any that don't exist for this project (e.g. a library has no dev server; a script has no build step).
-- Conventions Claude would otherwise get wrong (naming patterns, file placement, layer rules) — derive these from ARCHITECTURE.md's actual stack and layering, not from any fixed example.
-- Hard constraints (e.g. "never import X in Y layer") specific to this project's architecture.
-- @docs/PRD.md and @docs/ARCHITECTURE.md as imports (reference, don't duplicate)
+## Step 2 - Verify
+Run each command once (use --help or a dry run for anything slow or destructive, and say so). Record pass/fail. If the baseline test suite fails, list the failing tests under "Known baseline failures". Do NOT fix them here.
 
-Exclude:
-- Feature descriptions (already in PRD.md)
-- Architecture rationale (already in ARCHITECTURE.md)
-- Anything Claude can derive from reading the code itself
-- Aspirations, goals, or explanatory prose
-
-## Template to fill
+## Step 3 - Write using this template
 ```
 # [App name]
-@docs/PRD.md
-@docs/ARCHITECTURE.md
+@docs/PRD.md            <- only if it exists
+@docs/ARCHITECTURE.md   <- only if it exists
 
 ## Commands
-- [label]: [command]   ← one line per command that actually exists for this stack
+- install / build / dev / lint / format / typecheck: [command]
+- test (all): [command]
+- test (single file): [command]
+- test (single test): [command]
+- coverage: [command]   <- only if it exists
+
+## Testing
+- Layout, naming, fixtures, mocking rules, which level (unit/integration) for what
+- Known baseline failures: [names, or none]
+(build-phase and validate-phase read this section - keep it exact)
 
 ## Conventions
-- [one hard rule per line, 10–20 lines max]
+- [one rule per line, 10-20 lines max, each evidence-backed]
 
 ## Constraints
-- [absolute prohibitions only, 5–10 lines max]
+- [absolute prohibitions, 5-10 lines max]
 ```
 
 ## Self-check (mandatory before saving)
-1. Count lines in the draft.
-2. 150 lines is a target, not a hard wall. The ONLY valid justification for exceeding it is a structural one tied to the stack itself (e.g. "N independently-deployed services each need their own command block") — never "there was more to say" or "the project is complex." State the justification in one line before saving.
-3. If over 150 with no such structural justification: cut the least actionable lines until under 150. List what you cut and why.
-4. Verify every line is either a command, a convention Claude would get wrong, or a hard constraint. Remove anything else.
+1. Count lines. 150 is a target; the only valid reason to exceed it is structural (e.g. N independently deployed services each needing a command block). State that reason in one line.
+2. If over 150 without such a reason, cut the least actionable lines and list what you cut and why.
+3. Every line must be a command, a convention Claude would get wrong, or a hard constraint. Remove the rest.
 
 ## Save
-Write to CLAUDE.md. Print "CLAUDE.md saved — [N] lines" and whether it was a fresh write or a merge/update. Stop.
+Write CLAUDE.md. Print "CLAUDE.md saved - [N] lines", whether it was a fresh write or a merge/update (with what changed), and a list of any commands you could not verify. Stop.

@@ -1,109 +1,116 @@
 ---
-description: Build phase of the app — scaffold, implement, test, commit
-argument-hint: "<phase-num>"
+description: Implement one task in an existing codebase - recon, brief, tests first, implement, verify, commit
+argument-hint: "<task description | Task Brief>"
 model: sonnet
-context: fork
 allowed-tools: Bash, Read, Write, Edit, MultiEdit, Glob, Grep
 ---
 
-ROLE: Senior engineer implementing a single, spec-referenced phase
-TASK: Implement Phase PHASE_NUM of the app as defined in docs/ARCHITECTURE.md, with every piece of code traceable to a PRD requirement
-CONTEXT: This command works on projects at any stage — day one or deep into a phase plan. Spec is in docs/PRD.md (requirements have IDs per that PRD's own numbering scheme). Architecture phase plan is in docs/ARCHITECTURE.md. Conventions are in CLAUDE.md. Previous phases are already committed — do not touch them unless broken.
-CONSTRAINTS: Implement Phase PHASE_NUM ONLY. Nothing from Phase PHASE_NUM+1. No speculative abstractions. No refactoring outside this phase's scope. Output is working code committed to git, plus the report in Step 6.
+ROLE: Senior engineer making one change in an existing codebase, with tests that would catch a regression
+TASK: Implement: $ARGUMENTS
+CONTEXT: No PRD or architecture doc is assumed. "Done" is defined by the task text, the existing code and tests, and the Task Brief you derive and the user approves at Gate 1. Scenario checklist: @.claude/shared/scenario-checklist.md
+CONSTRAINTS: This task only. No drive-by refactors or reformatting. No new dependencies unless approved at Gate 1. No destructive git commands (reset --hard, checkout --, clean, stash drop, force push). Output is working code plus tests, committed with approval, plus the Step 9 report.
 
-## PHASE NUMBER — READ THIS FIRST
-PHASE_NUM = $ARGUMENTS (take the first token as the integer phase number).
-You MUST implement exactly Phase PHASE_NUM as numbered in docs/ARCHITECTURE.md.
-Do NOT auto-detect the phase from git history, existing files, or any other heuristic.
-If $ARGUMENTS is "1", implement Phase 1. If "3", implement Phase 3. No exceptions.
+Live state (verify these render; if they appear as literal text, run the git commands yourself):
+- Branch: !`git branch --show-current`
+- Last commit: !`git log --oneline -1`
+- Uncommitted: !`git status --short`
 
-## Step 0 — Preconditions
-Before reading anything else, verify the prerequisites this command depends on exist:
-- If docs/PRD.md is missing → stop and tell the user to run /spec-interview first.
-- If docs/ARCHITECTURE.md is missing → stop and tell the user to run /spec-arch first.
-- If docs/ARCHITECTURE.md has no section numbered PHASE_NUM → stop and tell the user the valid phase range, and ask which they meant.
-- If CLAUDE.md is missing, proceed but note that conventions and the test command are unknown — ask the user for the test command in Step 4 instead of guessing.
+## Step 0 - Preconditions
+- If $ARGUMENTS is empty, ask for the task and stop.
+- If there are uncommitted changes, list them and ask: proceed (they will never be staged), stash, or stop.
+- If on the default branch (main/master/develop), ask whether to create a branch and suggest a name.
+- Find commands: CLAUDE.md (Commands + Testing) first, then package scripts / Makefile / CI config. If test command is still unknown, ask. Never substitute a guess.
+- If REPO_ANALYSIS.md exists and its recorded commit matches or is close to HEAD, use it for recon. Otherwise ignore it.
 
-## Setup
-Read these files before doing anything else:
-1. CLAUDE.md (if present) — conventions and commands. Note the exact test command listed under Commands — you will run this verbatim in Step 4. Note the requirement-citation convention (e.g. `// R-##`, `# R-##`, a docstring tag) if CLAUDE.md specifies one; otherwise default to a same-line comment in the file's native comment syntax citing the requirement ID scheme used in docs/PRD.md.
-2. docs/PRD.md — requirements (note the requirement ID scheme, e.g. R-1, R-2, or whatever numbering the PRD actually uses)
-3. docs/ARCHITECTURE.md — read the FULL file; extract the Phase PHASE_NUM section AND the folder structure, data models, database schema sections, and the declared architecture layers/module boundaries and their dependency direction (e.g. domain has no dependents among lower layers, or module A must not import module B)
+## Step 1 - Recon (read-only)
+1. Locate the code involved. Read at least 2 sibling implementations and their tests.
+2. Grep for callers of everything you may change.
+3. Identify layering/import direction, naming and placement patterns, error-handling and logging style, public contracts touched.
+4. `git log -5 -- <area>`: recent changes and any earlier Task Briefs in commit bodies.
 
-Extract from docs/ARCHITECTURE.md for Phase PHASE_NUM:
-- The exact bullet list of deliverables for Phase PHASE_NUM
-- Every file path mentioned in the folder structure that belongs to Phase PHASE_NUM's scope
-- Every data model definition (field names, types, constraints) relevant to this phase
-- Every database schema (SQL) relevant to this phase
+## Step 2 - Baseline
+Run the full test command (plus lint/typecheck if they exist) BEFORE editing. Record pass/fail counts and the names of failing tests: these are pre-existing failures and are NOT yours to fix. If any overlap the area you will change, tell the user. If the suite is very slow, run the area subset and say so.
 
-These extracted definitions are your source of truth for field names, file placement, and layer boundaries. Do NOT invent field names or file paths — use exactly what docs/ARCHITECTURE.md specifies.
+## Step 3 - Task Brief + Test Plan + Scaffold (GATE 1)
+Produce, without writing any file:
+1. Task Brief: goal, in/out of scope (at least 3 out), ACs (AC-1..n, "The system shall ..."), assumptions, blocking questions. If $ARGUMENTS already contains ACs from /spec-interview, reuse them.
+2. Test Plan: apply the checklist. One row per category: APPLICABLE (scenarios -> test name -> level -> file) or N/A (reason grounded in the code).
+3. File tree: files to create/modify, each marked new/modified and "mirrors <existing file>".
+4. Anything beyond the ACs marked SPECULATIVE: ask keep or cut.
+Ask blocking questions (batch of at most 3). List non-blocking ones as assumptions.
+STOP. Wait for explicit approval. Only then create the files.
 
-Current branch:          !git branch --show-current
-Last commit:             !git log --oneline -1
-Uncommitted changes:     !git status --short
+## Step 4 - Tests first
+- Bug fix: write a failing repro test first. Run it. It must fail for the stated reason. Show the output.
+- Feature: write tests for every AC and every APPLICABLE scenario. Run them. They must fail for the right reason (not an import or syntax error).
+- Untested legacy code you will modify: first write characterization tests that pin current behavior. They must pass on the unmodified code.
+Test rules: mirror the repo's layout, naming, fixtures and helpers. Put the AC id in the test name or describe block. Assert behavior, not implementation. No sleeps, no network, no order dependence. Do not mock what is cheap to run for real.
+After each test file: 2-line summary (what it covers | which ACs/scenarios).
 
-## Rules (enforce all — do not skip any)
-- Every implemented function or class must include a comment citing its PRD requirement, using the citation convention identified in Setup step 1
-- Keep only 1 line in functions for that requirement citation comment — never a multi-line comment block or docstring
-- Follow every naming convention, file placement rule, and layer constraint in CLAUDE.md exactly
-- Field names in domain models, entities, and data-access objects must match docs/ARCHITECTURE.md exactly — use its exact names, never abbreviate or rename
-- File paths must match the folder structure in docs/ARCHITECTURE.md exactly
-- Database column names must match the SQL schema in docs/ARCHITECTURE.md exactly
-- Only implement files and features listed in Phase PHASE_NUM's deliverables — nothing from other phases
-- If unsure about a design decision → STOP and ask. Never assume.
-- Do not refactor code from previous phases unless it is demonstrably broken by this phase's changes.
-- Clean up any temp or scratch files before finishing.
+## Step 5 - Implement
+Follow the import-direction seen in recon: lowest-level, most-depended-upon code first.
+After EACH file: 2-line summary (does | exports/changes) plus the AC ids it serves. Run the narrowest relevant tests. Do not move on until they pass.
+Rules:
+- Mirror neighboring naming, placement and error handling. Grep for an existing helper before writing a new one.
+- No new cross-layer imports. No debug leftovers. No TODOs without the user's OK.
+- If CLAUDE.md declares a requirement-citation convention, follow it exactly (one line max). Otherwise trace via test names and the commit body, not source comments.
+- If unsure about a design decision: STOP and ask. Never assume.
 
-## Step 1 — Scaffold
-Create the folder structure and empty files for Phase PHASE_NUM. If some files already exist (e.g. this phase was partially started before), report what already exists instead of overwriting it blindly.
-Show the file tree. STOP. Wait for explicit approval before writing any logic.
+## Step 6 - Self-review (read your own diff)
+Run `git diff` and check:
+- Only planned files changed; every hunk maps to an AC; no unrelated formatting or renames
+- No debug output, commented-out code, secrets
+- Error paths and resource cleanup handled as surrounding code does
+- Callers of any changed signature updated (grep again)
+- Public contracts, schemas, config remain backward compatible; migrations reversible
+- Docs, types, changelog, API specs updated if the repo maintains them
+- Lint, format and type checks pass
+Fix problems before testing.
 
-## Step 2 — Implement
-Write logic file by file, in the dependency order declared by docs/ARCHITECTURE.md's layers/modules (lowest-level, most-depended-upon code first; code that depends on it follows). If ARCHITECTURE.md doesn't spell out an explicit build order, infer it from its stated dependency direction between layers/modules.
-After EACH file:
-- Print a 2-line summary: what it does | what it exports
-- Confirm it satisfies the PRD requirement(s) it implements (cite its requirement ID)
-Do not move to the next file until the current one is complete.
+## Step 7 - Verify
+a. New tests pass.
+b. Full suite + lint + typecheck (+ build if it exists). Compare with the Step 2 baseline: no NEW failures. Pre-existing failures are reported, not fixed.
+c. If new tests involve time, async, concurrency or randomness, run them 3 times.
+d. Can-fail check: if a mutation tool exists (from manifests/CLAUDE.md), run it on changed files. Otherwise pick the 2-3 most important branches, make a one-line temporary break via str_replace, confirm a test fails, revert that exact edit, and re-run to confirm green. Report each.
+e. If coverage tooling exists, check changed lines. Test each uncovered line or justify it.
+f. Failures caused by this change: fix now. Do not proceed with new failures.
 
-## Step 3 — Self-review
-Before running tests, verify:
-- Every public class/function has a requirement citation using the convention identified in Setup step 1
-- Every file follows CLAUDE.md naming and placement conventions
-- No code belonging to Phase PHASE_NUM+1 crept in — remove it if so
-- No hardcoded values that should be constants or config
+## Step 8 - Commit (GATE 2, requires approval)
+Stage only the files this task created or modified, by explicit path. Never `git add -A`. Never stage files listed as pre-existing uncommitted changes. Do not commit yet.
+Draft the message:
+```
+[imperative title, max 72 chars]
 
-## Step 4 — Test
-Run the exact test command from CLAUDE.md's Commands section (noted in Setup step 1). Never assume or substitute a different build tool's command — if CLAUDE.md doesn't list one, stop and ask the user for it before proceeding.
-- If tests fail: fix them now. Do NOT proceed with failing tests.
+[1-2 sentences: what and why]
 
-## Step 5 — Commit (requires approval)
-Stage only the files created or modified in this phase. Do NOT use `git add -A`. Do not run `git commit` yet.
-
-Draft a commit message:
-- Title line: `[short phase title from ARCHITECTURE.md]`
-- A short description (1-4 bullet points) summarizing what was actually implemented in this phase — the key files/components added and the requirement IDs they cover. No fluff, no restating the whole PRD.
-
-Show the drafted commit message to the user and ask for explicit approval to commit.
-- If the user says no / declines: do NOT commit. Leave the changes staged (or as they are) and proceed directly to Step 6, reporting "Commit: skipped (user declined)".
-- If the user says yes: run the commit using that title + description via a HEREDOC, e.g.:
+Acceptance criteria:
+- AC-1 ...
+- AC-2 ...
+Tests: [files/names added]. Baseline: [N pre-existing failures unchanged | none]
+Not covered: [known gaps, and N/A categories worth knowing]
+```
+Show it and ask for explicit approval.
+- Declined: do not commit; report "skipped (user declined)".
+- Approved: commit via HEREDOC:
 ```
 git commit -m "$(cat <<'EOF'
-[short phase title]
+[title]
 
-- [what was implemented, point 1]
-- [what was implemented, point 2]
+[body]
 EOF
 )"
 ```
 
-## Step 6 — Report and stop
+## Step 9 - Report and stop
 Print exactly:
 ```
-Phase PHASE_NUM complete.
-Files created: [list]
-Requirements covered: [requirement ID list, per PRD's own numbering scheme]
-Tests: PASS / FAIL
-Commit: [hash, or "skipped (user declined)"]
+Task complete.
+Files: created [...] / modified [...]
+AC -> tests: AC-1 -> [test names] ...
+Scenario categories: APPLICABLE n / N/A n  (list each N/A with its reason)
+Baseline vs now: before [pass/fail] -> after [pass/fail]; pre-existing failures untouched: [names]
+Can-fail check: [results]
+Assumptions / known gaps: [...]
+Commit: [hash | skipped (user declined)]
 ```
-
-Do NOT start Phase PHASE_NUM+1. Stop here and wait.
+Do NOT start another task. Suggest: run /clear, then /validate-phase <hash> for an independent review.

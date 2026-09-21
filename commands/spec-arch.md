@@ -1,42 +1,51 @@
 ---
-description: Read docs/PRD.md and produce or update docs/ARCHITECTURE.md, at any project stage
-model: sonnet
+description: Plan a multi-step change in an existing codebase - design, blast radius, overengineering audit, step breakdown
+argument-hint: "<task description or Task Brief>"
+model: opus
+allowed-tools: Read, Glob, Grep, Bash(git log:*), Bash(git status:*), Bash(git ls-files:*)
 ---
 
-ROLE: Software architect producing a committed Architecture Decision Record
-TASK: Read docs/PRD.md and produce (or revise) a single, committed architecture for the app
-CONTEXT: Requirements are locked in docs/PRD.md. Architecture must be constrained by the spec — not an open-ended design exercise. Every decision must be justified against a specific PRD requirement. This may be a fresh app, or a project with an existing docs/ARCHITECTURE.md and already-implemented phases — detect which before proposing anything.
-CONSTRAINTS: No implementation code. No package installation. If you surface multiple options, commit to one before saving — "Rejected Options" is a required section. Never silently discard already-completed phases.
+ROLE: Software architect making ONE committed design decision inside a codebase that already exists
+TASK: Produce a change plan for: $ARGUMENTS
+CONTEXT: No ARCHITECTURE.md is assumed - the existing code IS the architecture. If a Task Brief is in the arguments or conversation, use its ACs. Otherwise derive a minimal one (ACs + out of scope) and get confirmation before continuing. Checklist: @.claude/shared/scenario-checklist.md
+CONSTRAINTS: No implementation code. No package installation. Commit to one option before finishing; "Rejected Options" is required. Existing patterns beat new patterns - any deviation needs a stated reason. No refactoring of unrelated code.
 
-## Step 0 — Detect current state
-1. Does docs/ARCHITECTURE.md already exist? If so, read it fully.
-2. If it exists, check git log / committed code for which phases are already done. Treat those phases and their stack decisions as fixed — this run only adds, revises later phases, or documents deltas the user asks for. Do not silently redefine a stack or data model out from under completed work.
-3. If docs/ARCHITECTURE.md does not exist, this is a fresh architecture pass — proceed as normal.
+## Step 0 - Recon (as-built architecture)
+Extract from the code, with file paths as evidence:
+- Module boundaries and layering direction (from imports, lint/import-boundary configs)
+- Data models/schemas the task touches, with EXACT field names as they exist
+- How the most similar existing feature is built (cite the files)
+- Test layout and what already covers the area
+- Public contracts: API, CLI, events, schema, config, flags
+- How migrations/deploys work here
+State the current architecture in at most 8 lines.
 
-State plainly whether this is a fresh ADR or a revision, and if a revision, which phases are locked.
+## Step 1 - Blast radius
+For each file/symbol likely to change, a table row:
+| symbol/file | callers (grep) | tests covering it | contracts affected | data affected |
+Untested callers or untested changed code are risks - mark them.
 
-## Step 1 — Stack proposal
-For each decision, name ONE choice and give a one-line justification tied to a PRD requirement:
-- Language + framework (with reason) — if locked by a prior phase, restate it, don't re-decide it
-- Database or persistence approach (with reason — omit if the PRD implies none)
-- Required libraries only (each must map to a PRD feature — no speculative additions)
-- Folder tree — as shallow as the chosen stack's own conventions allow; justify any level beyond what's idiomatic for that stack/framework
-- Core data models (field names and types only — no code)
+## Step 2 - Design (one choice per decision)
+Each decision gets a one-line justification tied to an AC or a repo constraint:
+- Where the change lives (existing home first; new files only if no home exists)
+- Reused helpers/patterns (name them)
+- Data change: migration, backward compatibility with existing rows/data, rollback
+- Rollout: flag or direct
 
-## Step 2 — Overengineering audit (mandatory)
-For every library and architectural pattern proposed, ask: "Is this required by a PRD feature, or am I adding it speculatively?"
-List each item with verdict: REQUIRED (cite PRD feature) or SPECULATIVE.
-Ask the user: keep or cut each SPECULATIVE item. Wait for answer before continuing.
+## Step 3 - Overengineering audit (mandatory)
+For every new dependency, abstraction, file, config key, or pattern: REQUIRED (cite AC) or SPECULATIVE. Ask the user: keep or cut each SPECULATIVE item. Wait for the answer before continuing.
 
-## Step 3 — ADR (Architecture Decision Record)
-Produce one ADR with these sections:
-- **Decision**: What is being built and with what stack
-- **Rationale**: Why this stack satisfies the PRD constraints (cite requirement numbers where possible)
-- **Rejected Options**: What alternatives were considered and why each was rejected against the spec
-- **Risks**: What could go wrong with this decision
-- **Phase Plan**: Phase 1 = foundation only (no business logic, independently runnable); each subsequent phase adds exactly one feature group, independently testable. Choose the grouping unit (feature, layer, or module) that best fits the chosen stack and say which one you used. If phases are already complete, keep their numbering and descriptions unchanged and continue numbering forward for new work.
+## Step 4 - Step plan
+Each step must be independently buildable, testable and committable, and must leave the suite green. Order lowest-dependency first. If untested code will be modified, Step 1 is a safety net (characterization tests only, no behavior change).
+Per step: goal | files | ACs covered | scenarios/tests (from the checklist) | risk | rollback.
+If a step needs more than ~10 files or cannot be described in 3 lines, split it.
 
-If you find yourself listing options without committing, stop and pick one. Justify it. The user can override — but you must commit first.
+## Step 5 - Decision record
+- Decision (what and how)
+- Rationale (cite ACs and repo evidence)
+- Rejected Options (each rejected against a specific AC or constraint)
+- Risks
 
-## Step 4 — Save
-Write docs/ARCHITECTURE.md. Print phase count and how many are already complete vs. newly planned. Stop.
+Print the plan. Do not save it unless asked. End with one paste-ready line per step:
+`/build-phase Step N of M: <goal> - ACs: ...`
+Stop.
