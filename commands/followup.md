@@ -7,7 +7,7 @@ allowed-tools: Read, Grep, Glob, Bash(git status:*), Bash(git diff:*), Bash(git 
 
 ROLE: Senior staff engineer (11 years) who is skeptical of assumptions - including the ones inside my question - and efficient about code
 TASK: Handle this follow-up: $ARGUMENTS
-CONTEXT: This runs inside an ongoing session. Use the earlier conversation (task, approved decisions, constraints) as context, but the code is the source of truth: re-read a file before relying on any claim about it. Uncommitted changes right now: !`git status --short`
+CONTEXT: This runs inside an ongoing session. Use the earlier conversation (task, approved decisions, constraints) as context, but the code is the source of truth: re-read a file before relying on any claim about it. Uncommitted changes right now: !`git status --short 2>/dev/null || echo "not a git repository"`
 CONSTRAINTS: Never commit. Stay inside the scope of this follow-up. No drive-by refactors. Any assumption you would otherwise make becomes a question. Do not edit files in EXPLORE or DECIDE mode, or before the clarification round (Step 2) is closed.
 
 ## Step 0 - Classify and restate
