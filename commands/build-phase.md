@@ -11,9 +11,9 @@ CONTEXT: No PRD or architecture doc is assumed. "Done" is defined by the task te
 CONSTRAINTS: This task only. No drive-by refactors or reformatting. No new dependencies unless approved at Gate 1. No destructive git commands (reset --hard, checkout --, clean, stash drop, force push). Output is working code plus tests, committed with approval, plus the Step 9 report.
 
 Live state (verify these render; if they appear as literal text, run the git commands yourself):
-- Branch: !`git branch --show-current`
-- Last commit: !`git log --oneline -1`
-- Uncommitted: !`git status --short`
+- Branch: !`git branch --show-current 2>/dev/null || echo "not a git repository"`
+- Last commit: !`git log --oneline -1 2>/dev/null || echo "not a git repository"`
+- Uncommitted: !`git status --short 2>/dev/null || echo "not a git repository"`
 
 ## Step 0 - Preconditions
 - If $ARGUMENTS is empty, ask for the task and stop.
@@ -44,7 +44,7 @@ STOP. Wait for explicit approval. Only then create the files.
 - Bug fix: write a failing repro test first. Run it. It must fail for the stated reason. Show the output.
 - Feature: write tests for every AC and every APPLICABLE scenario. Run them. They must fail for the right reason (not an import or syntax error).
 - Untested legacy code you will modify: first write characterization tests that pin current behavior. They must pass on the unmodified code.
-Test rules: mirror the repo's layout, naming, fixtures and helpers. Put the AC id in the test name or describe block. Assert behavior, not implementation. No sleeps, no network, no order dependence. Do not mock what is cheap to run for real.
+Test rules: mirror the repo's layout, naming, fixtures and helpers. Put the AC id in the test name (or a JS describe() title), never in a docstring or comment. Assert behavior, not implementation. No sleeps, no network, no order dependence. Do not mock what is cheap to run for real.
 After each test file: 2-line summary (what it covers | which ACs/scenarios).
 
 ## Step 5 - Implement
@@ -53,13 +53,18 @@ After EACH file: 2-line summary (does | exports/changes) plus the AC ids it serv
 Rules:
 - Mirror neighboring naming, placement and error handling. Grep for an existing helper before writing a new one.
 - No new cross-layer imports. No debug leftovers. No TODOs without the user's OK.
-- If CLAUDE.md declares a requirement-citation convention, follow it exactly (one line max). Otherwise trace via test names and the commit body, not source comments.
+- Comments and docstrings, tests included:
+  - Write one only for what the code and names cannot say: a non-obvious constraint, a reason, a trap. Delete any that restates the code or the test name.
+  - At most 2 sentences, summary line included. No :param/:return:/:raises: lists unless the file already uses them; put return and error meaning in the sentences.
+  - No AC, task or ticket ids and no wording relative to this change ("as today", "parity", "new", "rewrites the old test"). If CLAUDE.md declares a requirement-citation convention, follow it exactly (one line max). Otherwise trace via test names and the commit body.
+  - Every claim must match the code as written: the real caller, mock or behavior, not the intended one.
 - If unsure about a design decision: STOP and ask. Never assume.
 
 ## Step 6 - Self-review (read your own diff)
 Run `git diff` and check:
 - Only planned files changed; every hunk maps to an AC; no unrelated formatting or renames
 - No debug output, commented-out code, secrets
+- Every comment and docstring in the diff, and any unchanged one the change made wrong, is accurate and follows the Step 5 comment rules
 - Error paths and resource cleanup handled as surrounding code does
 - Callers of any changed signature updated (grep again)
 - Public contracts, schemas, config remain backward compatible; migrations reversible

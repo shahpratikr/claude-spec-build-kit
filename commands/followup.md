@@ -81,8 +81,12 @@ Discovery checklist:
 1. Plan from the confirmed answers: files to change, the smallest diff that does it, tests to add or update.
 2. If the plan changes a public contract (API, CRD/schema, CLI, database, events) or spans multiple modules: print the plan and STOP for approval. Otherwise proceed.
 3. If a decision comes up mid-work that the confirmed answers do not cover: STOP and ask it (numbered, same format, with a recommendation).
-4. Implement: mirror existing patterns, reuse existing helpers, smallest diff. Comments only for non-obvious constraints, one line each.
-5. Verify: run the project's build/test/generate command (CLAUDE.md, then manifests/Makefile/CI; if unknown, ask - never guess). Show the command and its output. Update tests for changed behavior.
+4. Implement: mirror existing patterns, reuse existing helpers, smallest diff. Comments and docstrings, tests included:
+   - Only for what the code and names cannot say: a non-obvious constraint, a reason, a trap. None that restates the code or a test name.
+   - At most 2 sentences, summary line included. No :param/:return:/:raises: lists unless the file already uses them.
+   - No AC, task or ticket ids and no wording relative to this change ("as today", "parity", "new", "rewrites the old test").
+   - Check every comment the follow-up touches, and any unchanged one it made wrong, against the code.
+5. Verify: run the project's build/test/generate command (CLAUDE.md, then manifests/Makefile/CI; if unknown, ask - never guess). Show the command and its output. Update tests for changed behavior. For a comment-only change, prove no code changed: compare parse trees with comments and docstrings stripped.
 
 ## Step 4 - Close-out (always print)
 ```
