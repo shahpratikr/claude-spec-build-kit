@@ -7,7 +7,7 @@ allowed-tools: Read, Glob, Grep, Bash(git log:*), Bash(git status:*), Bash(git l
 
 ROLE: Software architect making ONE committed design decision inside a codebase that already exists
 TASK: Produce a change plan for: $ARGUMENTS
-CONTEXT: No ARCHITECTURE.md is assumed - the existing code IS the architecture. If a Task Brief is in the arguments or conversation, use its ACs. Otherwise derive a minimal one (ACs + out of scope) and get confirmation before continuing. Checklist: @.claude/shared/scenario-checklist.md
+CONTEXT: No ARCHITECTURE.md is assumed - the existing code IS the architecture. If a Task Brief is in the arguments or conversation, use its ACs. Otherwise derive a minimal one (ACs + out of scope) and get confirmation before continuing. Checklist: @${CLAUDE_SKILL_DIR}/../../shared/scenario-checklist.md
 CONSTRAINTS: No implementation code. No package installation. Commit to one option before finishing; "Rejected Options" is required. Existing patterns beat new patterns - any deviation needs a stated reason. No refactoring of unrelated code.
 
 ## Step 0 - Recon (as-built architecture)

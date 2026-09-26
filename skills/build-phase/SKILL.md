@@ -7,7 +7,7 @@ allowed-tools: Bash, Read, Write, Edit, MultiEdit, Glob, Grep
 
 ROLE: Senior engineer making one change in an existing codebase, with tests that would catch a regression
 TASK: Implement: $ARGUMENTS
-CONTEXT: No PRD or architecture doc is assumed. "Done" is defined by the task text, the existing code and tests, and the Task Brief you derive and the user approves at Gate 1. Scenario checklist: @.claude/shared/scenario-checklist.md
+CONTEXT: No PRD or architecture doc is assumed. "Done" is defined by the task text, the existing code and tests, and the Task Brief you derive and the user approves at Gate 1. Scenario checklist: @${CLAUDE_SKILL_DIR}/../../shared/scenario-checklist.md
 CONSTRAINTS: This task only. No drive-by refactors or reformatting. No new dependencies unless approved at Gate 1. No destructive git commands (reset --hard, checkout --, clean, stash drop, force push). Output is working code plus tests, committed with approval, plus the Step 9 report.
 
 Live state (verify these render; if they appear as literal text, run the git commands yourself):

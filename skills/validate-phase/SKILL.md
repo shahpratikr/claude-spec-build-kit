@@ -28,7 +28,7 @@ OUTPUT: table - AC | YES/PARTIAL/NO | code evidence | test evidence; then "unreq
 
 ### Agent 2 - gap-hunter (adversarial)
 ROLE: Skeptical reviewer who assumes the author missed something
-TASK: Read `.claude/shared/scenario-checklist.md`. Read the production diff and the callers of changed code FIRST. For each checklist category, list the scenarios that ought to be tested. Then read the tests and mark each scenario covered or uncovered. Also scan the production diff for defects: off-by-one, null handling, swallowed errors, missing await, races, resource leaks, unsafe SQL/HTML/paths, authorization gaps, secrets in logs. For any category the author marked N/A, say whether the reason holds.
+TASK: Read `${CLAUDE_SKILL_DIR}/../../shared/scenario-checklist.md`. Read the production diff and the callers of changed code FIRST. For each checklist category, list the scenarios that ought to be tested. Then read the tests and mark each scenario covered or uncovered. Also scan the production diff for defects: off-by-one, null handling, swallowed errors, missing await, races, resource leaks, unsafe SQL/HTML/paths, authorization gaps, secrets in logs. For any category the author marked N/A, say whether the reason holds.
 OUTPUT: only UNCOVERED items, max 15, ranked: category | scenario | concrete failure if untested | HIGH/MED/LOW | one-line suggested test. Then "N/A challenges".
 
 ### Agent 3 - convention-checker
