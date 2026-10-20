@@ -1,6 +1,6 @@
 # Scenario Coverage Checklist
 
-Used for test planning (build), gap hunting (validate), and question generation (interview).
+Used for test planning (build), gap hunting (the validation loop), and question generation (interview).
 
 RULE: every category below must end as APPLICABLE (concrete scenarios, each mapped to a named test)
 or N/A (a one-line reason grounded in the code or task, e.g. "no persistence touched: no DB imports in diff").

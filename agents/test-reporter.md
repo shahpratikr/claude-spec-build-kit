@@ -4,10 +4,21 @@ description: >
   Use this agent to run the project test suite and return a
   structured pass/fail report. Pass phase_number for context.
   Reads the test command from CLAUDE.md automatically.
-model: haiku
-allowedTools:
-  - Bash
-  - Read
+model: sonnet
+tools: Bash, Read
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: >-
+            GR_DIR=UNSET;
+            for d in "$GUARDRAILS_HOOKS_DIR" "$GR_DIR" "${CLAUDE_PROJECT_DIR}/.claude/hooks/guardrails" "$HOME/.claude/hooks/guardrails";
+            do [ -n "$d" ] && [ -f "$d/guard_bash.py" ] && exec python3 "$d/guard_bash.py"; done;
+            case "$GR_DIR" in UNSET|off) exit 0 ;; esac;
+            echo "guardrails: guard_bash.py not found in $GR_DIR. Reinstall it or re-run the guardrails setup." >&2; exit 2
+          timeout: 10
+          onFailure: block
 ---
 
 You run tests and report results.

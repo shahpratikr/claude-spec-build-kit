@@ -1,0 +1,48 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "GR_DIR=UNSET; for d in \"$GUARDRAILS_HOOKS_DIR\" \"$GR_DIR\" \"${CLAUDE_PROJECT_DIR}/.claude/hooks/guardrails\" \"$HOME/.claude/hooks/guardrails\"; do [ -n \"$d\" ] && [ -f \"$d/guard_prompt.py\" ] && exec python3 \"$d/guard_prompt.py\"; done; case \"$GR_DIR\" in UNSET|off) exit 0 ;; esac; echo \"guardrails: guard_prompt.py not found in $GR_DIR. Reinstall it or re-run the guardrails setup.\" >&2; exit 2",
+            "timeout": 10,
+            "onFailure": "block"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "GR_DIR=UNSET; for d in \"$GUARDRAILS_HOOKS_DIR\" \"$GR_DIR\" \"${CLAUDE_PROJECT_DIR}/.claude/hooks/guardrails\" \"$HOME/.claude/hooks/guardrails\"; do [ -n \"$d\" ] && [ -f \"$d/guard_bash.py\" ] && exec python3 \"$d/guard_bash.py\"; done; case \"$GR_DIR\" in UNSET|off) exit 0 ;; esac; echo \"guardrails: guard_bash.py not found in $GR_DIR. Reinstall it or re-run the guardrails setup.\" >&2; exit 2",
+            "timeout": 10,
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "GR_DIR=UNSET; for d in \"$GUARDRAILS_HOOKS_DIR\" \"$GR_DIR\" \"${CLAUDE_PROJECT_DIR}/.claude/hooks/guardrails\" \"$HOME/.claude/hooks/guardrails\"; do [ -n \"$d\" ] && [ -f \"$d/guard_write.py\" ] && exec python3 \"$d/guard_write.py\"; done; case \"$GR_DIR\" in UNSET|off) exit 0 ;; esac; echo \"guardrails: guard_write.py not found in $GR_DIR. Reinstall it or re-run the guardrails setup.\" >&2; exit 2",
+            "timeout": 10,
+            "onFailure": "block"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(~/.ssh/id_*)",
+      "Read(~/.aws/credentials)"
+    ]
+  }
+}

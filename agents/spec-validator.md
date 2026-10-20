@@ -5,11 +5,8 @@ description: >
   PRD acceptance criteria for a specific phase, at any project stage.
   Pass phase_number and changed_files. Returns a markdown table:
   criterion / YES/PARTIAL/NO.
-model: haiku
-allowedTools:
-  - Read
-  - Glob
-  - Grep
+model: sonnet
+tools: Read, Glob, Grep
 ---
 
 ROLE: Read-only compliance checker

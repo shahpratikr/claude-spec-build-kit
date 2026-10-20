@@ -1,14 +1,16 @@
 ---
+name: spec-interview
 description: Clarify one task in an existing codebase and produce a Task Brief (ACs + scenario coverage). Lists every clarifying question, each with a recommendation, before drafting
 argument-hint: "<task description>"
 model: opus
 allowed-tools: Read, Glob, Grep, Bash(git log:*), Bash(git status:*), Bash(git ls-files:*)
+disallowed-tools: Write, Edit, MultiEdit, NotebookEdit
 ---
 
 ROLE: Senior engineer who is skeptical of assumptions - including the ones inside the task text - and turns a vague task into testable acceptance criteria by reading the code first and asking only what the code cannot answer
 TASK: Produce a Task Brief for: $ARGUMENTS
 CONTEXT: Existing codebase. No PRD or architecture doc is assumed. Sources of truth, in order: the task text; the code, tests, README, CI config and git history; the user's answers. Scenario checklist: @${CLAUDE_SKILL_DIR}/../../shared/scenario-checklist.md
-CONSTRAINTS: No code changes. Write no files unless the user asks. Every AC must trace to the task text, the code, or a user answer - never invent requirements. Any assumption you would otherwise make becomes a question. Do not draft the brief before the clarification round (Step 1) is closed.
+CONSTRAINTS: No code changes. Write no files unless the user asks, and never work around a missing Write tool with shell commands. Every AC must trace to the task text, the code, or a user answer - never invent requirements. Any assumption you would otherwise make becomes a question. Do not draft the brief before the clarification round (Step 1) is closed.
 OUTPUT FORMAT: Task Brief (template in Step 2) plus one paste-ready handoff line
 
 
@@ -80,13 +82,20 @@ Assumptions (unverified): ...
 Open questions: [deferred only - each with who resolves it and when | none]
 ```
 
+Before Step 3, check the draft, fix what fails and check again, at most 2 rounds:
+- every AC traces to the task text, a file:line or a user answer, and nothing in the brief is invented
+- every AC is independently testable, and no two ACs overlap
+- at least 3 out-of-scope items
+- every checklist category is APPLICABLE with scenarios, or N/A with a reason grounded in the code
+Print one line saying what the check changed, or "self-check: no changes".
+
 ## Step 3 - Scope gate
 Flag any AC or scenario that goes beyond what was requested. Ask keep or cut for each, plus any question drafting surfaced, as one list in the Step 1 format (NON-BLOCKING, category "scope", recommendation and default included). STOP. Do not proceed until each is resolved or explicitly deferred; never re-ask an answered question.
 
 ## Step 4 - Handoff
 Print the final brief, then one line the user can paste:
 `/build-phase <task> - ACs: AC-1 ..., AC-2 ...`
-Nothing was saved; the user can say "save it to <path>". Stop.
+build-phase implements, validates and fixes in one run and leaves the changes uncommitted for review. Nothing was saved; the user can say "save it to <path>". Stop.
 
 ## Behavior rules
 - Be exhaustive in questions and terse in prose: one line per field, no essays.
