@@ -57,7 +57,7 @@ To turn fork mode off, add this to `~/.claude/settings.json`:
 
 ## First run: guardrails
 
-build-phase, followup, analyze-repo and spec-claudemd carry guardrail hooks. The first time you run one of them, it checks whether the hook scripts are installed:
+build-phase, followup, analyze-repo, spec-claudemd, spec-interview and spec-arch carry guardrail hooks. spec-interview and spec-arch guard only Bash, because they have no file-writing tools. The first time you run one of them, it checks whether the hook scripts are installed:
 
 1. **Already installed** in `<project>/.claude/hooks/guardrails/` or `~/.claude/hooks/guardrails/`: it uses them and asks nothing.
 2. **Not installed**: it asks whether you want guardrails. If you say yes, it asks where to put them:
@@ -97,6 +97,8 @@ A typical task:
 5. Review the change and commit it yourself. For multi-step plans, commit each step before starting the next.
 6. `/followup` for anything that comes up mid-session. `implement:` changes go through the same review loop as build-phase.
 
+**Questions.** Every skill asks through Claude Code's question picker: up to 4 questions per dialog, blocking ones first, with the recommended answer listed first. Choose "Other" to type your own answer. Where the picker isn't available, such as in `claude -p`, the skill prints the questions as text and waits for a reply like `defaults` or `defaults except Q3=B`.
+
 ### What build-phase does
 
 1. Snapshots the working tree without touching it (`git stash create`), so the change can be reviewed with no commit. Files you had already modified stay off-limits.
@@ -129,7 +131,7 @@ Pull the repository and copy the folders again, as in Install. Re-copying resets
 cd ~/.claude
 rm -r skills/{analyze-repo,build-phase,followup,spec-arch,spec-claudemd,spec-interview}
 rm agents/{convention-checker,criteria-auditor,gap-hunter,spec-validator,test-reporter}.md
-rm -r shared/guardrails shared/guardrails-setup.md shared/scenario-checklist.md shared/validation-loop.md
+rm -r shared/guardrails shared/guardrails-setup.md shared/question-round.md shared/scenario-checklist.md shared/validation-loop.md
 rm -r hooks/guardrails
 ```
 
@@ -154,6 +156,7 @@ To see the guardrails' decisions, read `guardrail-hooks.jsonl` in the `logs/` fo
 | `agents/*.md` | the subagents; reviewers have no write tools, and their Bash is limited to read-only commands |
 | `shared/scenario-checklist.md` | test-scenario categories used by build-phase, the reviewers and spec-interview |
 | `shared/validation-loop.md` | the review, fix and re-review procedure used by build-phase and followup |
+| `shared/question-round.md` | how every skill asks questions: the picker, the recommended-first order and the text fallback |
 | `shared/guardrails-setup.md` | the first-run guardrails questions |
 | `shared/guardrails/` | the hook scripts, `configure.py` (installs them and points the skills at them), and `settings.example.json` |
 

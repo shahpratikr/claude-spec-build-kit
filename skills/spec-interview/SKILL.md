@@ -5,17 +5,30 @@ argument-hint: "<task description>"
 model: opus
 allowed-tools: Read, Glob, Grep, Bash(git log:*), Bash(git status:*), Bash(git ls-files:*)
 disallowed-tools: Write, Edit, MultiEdit, NotebookEdit
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: >-
+            GR_DIR=UNSET;
+            for d in "$GUARDRAILS_HOOKS_DIR" "$GR_DIR" "${CLAUDE_PROJECT_DIR}/.claude/hooks/guardrails" "$HOME/.claude/hooks/guardrails";
+            do [ -n "$d" ] && [ -f "$d/guard_bash.py" ] && exec python3 "$d/guard_bash.py"; done;
+            case "$GR_DIR" in UNSET|off) exit 0 ;; esac;
+            echo "guardrails: guard_bash.py not found in $GR_DIR. Reinstall it or re-run the guardrails setup." >&2; exit 2
+          timeout: 10
+          onFailure: block
 ---
 
 ROLE: Senior engineer who is skeptical of assumptions - including the ones inside the task text - and turns a vague task into testable acceptance criteria by reading the code first and asking only what the code cannot answer
 TASK: Produce a Task Brief for: $ARGUMENTS
-CONTEXT: Existing codebase. No PRD or architecture doc is assumed. Sources of truth, in order: the task text; the code, tests, README, CI config and git history; the user's answers. Scenario checklist: @${CLAUDE_SKILL_DIR}/../../shared/scenario-checklist.md
-CONSTRAINTS: No code changes. Write no files unless the user asks, and never work around a missing Write tool with shell commands. Every AC must trace to the task text, the code, or a user answer - never invent requirements. Any assumption you would otherwise make becomes a question. Do not draft the brief before the clarification round (Step 1) is closed.
+CONTEXT: Existing codebase. No PRD or architecture doc is assumed. Sources of truth, in order: the task text; the code, tests, README, CI config and git history; the user's answers. Scenario checklist: @${CLAUDE_SKILL_DIR}/../../shared/scenario-checklist.md Question round: @${CLAUDE_SKILL_DIR}/../../shared/question-round.md Guardrails setup: @${CLAUDE_SKILL_DIR}/../../shared/guardrails-setup.md
+CONSTRAINTS: No code changes. Write no files unless the user asks, and never work around a missing Write tool with shell commands. The guardrails setup is the one exception: it installs its scripts only after the user says yes. When guardrails are installed, a hook denies destructive git commands and reads of credential files; if a call is denied with [guardrail:...], do not retry it another way: report it. Every AC must trace to the task text, the code, or a user answer - never invent requirements. Any assumption you would otherwise make becomes a question. Do not draft the brief before the clarification round (Step 1) is closed.
 OUTPUT FORMAT: Task Brief (template in Step 2) plus one paste-ready handoff line
 
 
 ## Step 0 - Recon (before asking anything)
-If $ARGUMENTS is empty, ask for the task and stop.
+If $ARGUMENTS is empty, ask for the task and stop. Otherwise run the guardrails setup first.
 1. Restate the task as numbered items (T1..Tn), one line each.
 2. Premise check: verify every factual claim embedded in the task wording ("since X already validates Y...") against the code or docs. If a premise is false or unverified, say so BEFORE anything else.
 3. Locate the code the task touches (grep domain terms; find entry points, routes, handlers, commands).
@@ -26,28 +39,12 @@ If $ARGUMENTS is empty, ask for the task and stop.
 Report 3-6 lines: what exists, what already has tests, what looks risky. Every claim about the code cites file:line and is tagged [Certain] (read it or ran it), [Likely] (strong inference) or [Guessing]. If most of it is guessing, say that first.
 
 ## Step 1 - Clarification round (mandatory)
-Goal: surface EVERY unresolved question now, in one list, so the user answers once instead of discovering your assumptions in the brief later.
+Goal: surface EVERY unresolved question now, in one round, so the user answers once instead of discovering your assumptions in the brief later.
 
 Rules:
 1. Walk the discovery checklist below. For each category, either write questions or write "resolved by code: file:line". "Not relevant" needs a one-line reason.
 2. No cap and no padding. Every question must change an AC, the scope, or the scenario coverage, and its "Why it matters" line must say how. Delete any question that fails that test.
-3. Print the full list as plain text in chat. Do NOT use a structured question/option picker tool for this round - those tools limit how many questions fit per call and can return empty answers.
-4. Order: BLOCKING questions first, then NON-BLOCKING, grouped by category.
-5. Use exactly this format per question:
-
-```
-Q<n> [BLOCKING | NON-BLOCKING] [category] <question>
-   Why it matters: <how the answer changes an AC, the scope or the coverage>
-   Options: A) ...  B) ...  (C) ...
-   Recommendation: <option> - <reason> [Certain | Likely | Guessing]
-   If unanswered I will: <default action>
-```
-
-6. After the list, print:
-   - "Resolved from code (challenge me if wrong)": item -> file:line
-   - "Recommended path": 2-4 lines on what the brief looks like if the user accepts every recommendation
-   - "Reply with": `defaults` | `defaults except Q3=B, Q7: <text>` | `skip Q5` | answers per question
-7. STOP. Do nothing else until the user answers.
+3. Ask them all as the question round says. Do nothing else until the answers are in.
 If, after recon, nothing is unresolved, print "No open questions" plus the resolved-from-code list, then continue to Step 2.
 
 Discovery checklist:
@@ -61,9 +58,7 @@ Discovery checklist:
 8. Conventions and constraints - existing patterns to follow, comment and style rules, things not to touch.
 
 ### After the user's answers
-- Print a "Confirmed" table: Q | answer | source (user | default). Unanswered NON-BLOCKING questions take their default, flagged as such.
-- An unanswered BLOCKING question means do not proceed: re-ask only those.
-- If the answers open new ambiguity, ask ONLY the new questions in the same format, then STOP again. Never re-ask an answered question. Repeat until no BLOCKING question is open.
+Follow "After the answers" in the question round, then continue to Step 2.
 
 ## Step 2 - Draft the Task Brief
 ```
@@ -90,7 +85,7 @@ Before Step 3, check the draft, fix what fails and check again, at most 2 rounds
 Print one line saying what the check changed, or "self-check: no changes".
 
 ## Step 3 - Scope gate
-Flag any AC or scenario that goes beyond what was requested. Ask keep or cut for each, plus any question drafting surfaced, as one list in the Step 1 format (NON-BLOCKING, category "scope", recommendation and default included). STOP. Do not proceed until each is resolved or explicitly deferred; never re-ask an answered question.
+Flag any AC or scenario that goes beyond what was requested. Ask keep or cut for each, plus any question drafting surfaced, as a question round (NON-BLOCKING, category "scope"). Do not proceed until each is resolved or explicitly deferred; never re-ask an answered question.
 
 ## Step 4 - Handoff
 Print the final brief, then one line the user can paste:

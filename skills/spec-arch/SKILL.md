@@ -5,15 +5,28 @@ argument-hint: "<task description or Task Brief>"
 model: opus
 allowed-tools: Read, Glob, Grep, Bash(git log:*), Bash(git status:*), Bash(git ls-files:*)
 disallowed-tools: Write, Edit, MultiEdit, NotebookEdit
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: >-
+            GR_DIR=UNSET;
+            for d in "$GUARDRAILS_HOOKS_DIR" "$GR_DIR" "${CLAUDE_PROJECT_DIR}/.claude/hooks/guardrails" "$HOME/.claude/hooks/guardrails";
+            do [ -n "$d" ] && [ -f "$d/guard_bash.py" ] && exec python3 "$d/guard_bash.py"; done;
+            case "$GR_DIR" in UNSET|off) exit 0 ;; esac;
+            echo "guardrails: guard_bash.py not found in $GR_DIR. Reinstall it or re-run the guardrails setup." >&2; exit 2
+          timeout: 10
+          onFailure: block
 ---
 
 ROLE: Software architect making ONE committed design decision inside a codebase that already exists
 TASK: Produce a change plan for: $ARGUMENTS
-CONTEXT: No ARCHITECTURE.md is assumed - the existing code IS the architecture. If a Task Brief is in the arguments or conversation, use its ACs. Otherwise derive a minimal one (ACs + out of scope) and get confirmation before continuing. Checklist: @${CLAUDE_SKILL_DIR}/../../shared/scenario-checklist.md
-CONSTRAINTS: No implementation code. No package installation. Do not create or change files by any route, including shell redirection, unless the user asks you to save the plan. Commit to one option before finishing; "Rejected Options" is required. Existing patterns beat new patterns - any deviation needs a stated reason. No refactoring of unrelated code.
+CONTEXT: No ARCHITECTURE.md is assumed - the existing code IS the architecture. If a Task Brief is in the arguments or conversation, use its ACs. Otherwise derive a minimal one (ACs + out of scope) and confirm it with the user through the question round before continuing. Checklist: @${CLAUDE_SKILL_DIR}/../../shared/scenario-checklist.md Question round: @${CLAUDE_SKILL_DIR}/../../shared/question-round.md Guardrails setup: @${CLAUDE_SKILL_DIR}/../../shared/guardrails-setup.md
+CONSTRAINTS: No implementation code. No package installation. Do not create or change files by any route, including shell redirection, unless the user asks you to save the plan. The guardrails setup is the one exception: it installs its scripts only after the user says yes. When guardrails are installed, a hook denies destructive git commands and reads of credential files; if a call is denied with [guardrail:...], do not retry it another way: report it. Commit to one option before finishing; "Rejected Options" is required. Existing patterns beat new patterns - any deviation needs a stated reason. No refactoring of unrelated code.
 
 ## Step 0 - Recon (as-built architecture)
-Extract from the code, with file paths as evidence:
+Run the guardrails setup first. Then extract from the code, with file paths as evidence:
 - Module boundaries and layering direction (from imports, lint/import-boundary configs)
 - Data models/schemas the task touches, with EXACT field names as they exist
 - How the most similar existing feature is built (cite the files)
@@ -35,7 +48,7 @@ Each decision gets a one-line justification tied to an AC or a repo constraint:
 - Rollout: flag or direct
 
 ## Step 3 - Overengineering audit (mandatory)
-For every new dependency, abstraction, file, config key, or pattern: REQUIRED (cite AC) or SPECULATIVE. Ask the user: keep or cut each SPECULATIVE item. Wait for the answer before continuing.
+For every new dependency, abstraction, file, config key, or pattern: REQUIRED (cite AC) or SPECULATIVE. Ask keep or cut for each SPECULATIVE item as a question round (category "scope"). Wait for the answers before continuing.
 
 ## Step 4 - Step plan
 Each step must be independently buildable, testable and reviewable, and must leave the suite green. build-phase leaves its changes uncommitted, so the user commits each step before starting the next. Order lowest-dependency first. If untested code will be modified, Step 1 is a safety net (characterization tests only, no behavior change).
