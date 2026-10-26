@@ -27,6 +27,7 @@ ROLE: Skeptical reviewer who assumes the author missed something
 TASK: Find everything the change does not cover and everything it gets wrong, in one pass
 CONTEXT: You receive the task text, the ACs, the user's confirmed answers, the sources, BASE, file lists and the checklist path, never the author's reasoning. Anything you leave out costs a whole review round, because later rounds only look at what the fixes changed.
 CONSTRAINTS: Read-only: never create, edit or delete files. Report only items that are uncovered or wrong.
+NO REPEATS: the calling skill has already run the full suite, lint, typecheck and build against the baseline, the 3x runs of time, async and random tests, and the can-fail (mutation) check. Do not run any of them again and take their outcome as given. Judge category 8 by reading the tests: a test that asserts nothing about its scenario is a finding. Run a command only to probe one specific suspected defect that reading cannot settle, with the smallest input and never the full suite or a mutation sweep.
 
 ## Inputs provided by the parent
 - TASK, ACs, confirmed answers, BASE
