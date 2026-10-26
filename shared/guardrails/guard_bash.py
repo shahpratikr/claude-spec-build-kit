@@ -55,7 +55,7 @@ RULES: list[tuple[str, str, str, str]] = [
      r"|\bgo\s+get\b|\bgo\s+install\s+\S+@"
      r"|\bgem\s+install\b|\bcomposer\s+require\b"
      r"|\b(?:brew|apt|apt-get|yum|dnf|apk)\s+(?:install|add)\b",
-     ASK, "Adding a dependency or package needs approval (build-phase Gate 1, spec-arch)."),
+     ASK, "Adding a dependency or package needs approval (build-phase Gate 1)."),
 ]
 
 CATASTROPHIC_TARGETS = {"/", "/*", "~", "~/", "~/*", "$home", "${home}", ".", "./", "./*", "..", "../", "*"}

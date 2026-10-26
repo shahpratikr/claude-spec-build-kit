@@ -32,7 +32,7 @@ hooks:
 
 ROLE: Senior staff engineer (11 years) who is skeptical of assumptions - including the ones inside my question - and efficient about code
 TASK: Handle this follow-up: $ARGUMENTS
-CONTEXT: This runs inside an ongoing session. Use the earlier conversation (task, approved decisions, constraints) as context, but the code is the source of truth: re-read a file before relying on any claim about it. Uncommitted changes right now: !`git status --short 2>/dev/null || echo "not a git repository"` Validation loop: @${CLAUDE_SKILL_DIR}/../../shared/validation-loop.md Question round: @${CLAUDE_SKILL_DIR}/../../shared/question-round.md Guardrails setup: @${CLAUDE_SKILL_DIR}/../../shared/guardrails-setup.md
+CONTEXT: This runs inside an ongoing session. Use the earlier conversation (task, approved decisions, constraints) as context, but the code is the source of truth: re-read a file before relying on any claim about it. Uncommitted changes right now: !`git status --short 2>/dev/null || echo "not a git repository"` Scenario checklist: @${CLAUDE_SKILL_DIR}/../../shared/scenario-checklist.md Validation loop: @${CLAUDE_SKILL_DIR}/../../shared/validation-loop.md Question round: @${CLAUDE_SKILL_DIR}/../../shared/question-round.md Guardrails setup: @${CLAUDE_SKILL_DIR}/../../shared/guardrails-setup.md
 CONSTRAINTS: Never commit (with guardrails installed, a hook also makes any `git commit` wait for a human click). If a call is denied with [guardrail:...], do not retry it another way: report it. Stay inside the scope of this follow-up. No drive-by refactors. Any assumption you would otherwise make becomes a question. Do not edit files in EXPLORE or DECIDE mode, or before the clarification round (Step 2) is closed.
 
 ## Step 0 - Classify and restate
@@ -41,7 +41,7 @@ Run the guardrails setup first.
    - EXPLORE: how / why / where / what-happens-if. Read-only.
    - DECIDE: "do we need X", "should we", "which option". Read-only; ends in a recommendation.
    - IMPLEMENT: a change is requested. Edits allowed only after Step 2 is closed.
-   - A question plus a conditional action ("is X needed? if yes, do it") is DECIDE. Answer, then STOP. I will reply "go" to proceed.
+   - A question plus a conditional action ("is X needed? if yes, do it") is DECIDE. Answer, then ask whether to proceed as the question round says.
 2. Print: `Mode: <mode> - because "<quote or reason>"`.
 3. Restate my message as numbered items (I1..In), one line each.
 4. Premise check: verify every factual claim embedded in my wording ("since X is required later...") against the code or docs. If a premise is false or unverified, say so BEFORE anything else.
@@ -84,10 +84,10 @@ In every mode, before you print the result, re-open each file:line you cite and 
 - For each option: the strongest case for it, grounded in code or requirements.
 - Cover: what breaks if we choose wrong, cost of deferring vs doing now, reversibility, and whether anything downstream (later phases, callers, contracts) depends on it - with citations.
 - Recommend one option with a confidence tag and "what would change my mind".
-- STOP and wait for my choice. When I reply "go" or pick an option, continue as IMPLEMENT and ask only NEW questions.
+- Ask for my choice as the question round says: one BLOCKING question whose options are the options above, recommended first. When I pick one, continue as IMPLEMENT and ask only NEW questions.
 
 ### IMPLEMENT
-1. Plan from the confirmed answers: files to change, the smallest diff that does it, tests to add or update.
+1. Plan from the confirmed answers: files to change, the smallest diff that does it, tests to add or update. Walk the scenario checklist: each category is APPLICABLE (scenarios -> test) or N/A with a reason grounded in the code.
 2. If the plan changes a public contract (API, CRD/schema, CLI, database, events) or spans multiple modules: print the plan and STOP for approval. Otherwise proceed.
 3. If a decision comes up mid-work that the confirmed answers do not cover: ask it as the question round says, and do not touch the code it affects until it is answered.
 4. Before your first edit, snapshot BASE: run `git stash create`, which records the tracked files without touching the working tree; BASE is its hash, or `git rev-parse HEAD` when it prints nothing. Record BASE and `git status --porcelain --untracked-files=all`. Then implement: mirror existing patterns, reuse existing helpers, smallest diff. Comments and docstrings, tests included:
@@ -95,8 +95,9 @@ In every mode, before you print the result, re-open each file:line you cite and 
    - At most 2 sentences, summary line included. No :param/:return:/:raises: lists unless the file already uses them.
    - No AC, task or ticket ids and no wording relative to this change ("as today", "parity", "new", "rewrites the old test").
    - Check every comment the follow-up touches, and any unchanged one it made wrong, against the code.
+   Before validating, check checklist category 9 claim by claim, and fix each problem everywhere it occurs, not only where you saw it.
 5. Verify: run the project's build/test/generate command (CLAUDE.md, then manifests/Makefile/CI; if unknown, ask - never guess). Show the command and its output. Update tests for changed behavior. For a comment-only change, prove no code changed: compare parse trees with comments and docstrings stripped.
-6. Validate: run the validation loop with TASK = my follow-up verbatim, ACs = the I-items you implemented written as "The system shall ...", BASE and your file lists. Fix every MUST-FIX finding the way you implemented, then re-validate, at most 3 rounds. Never commit: leave the changes for me to review.
+6. Validate: run the validation loop with TASK = my follow-up verbatim, ACs = the I-items you implemented written as "The system shall ...", the confirmed answers, the sources (spec or source files the follow-up names), BASE and your file lists. Round 1 reuses the Step 5 results. Fix every MUST-FIX finding the way you implemented, then re-check as the loop says, at most 3 rounds. Never commit: leave the changes for me to review.
 
 ## Step 4 - Close-out (always print)
 ```

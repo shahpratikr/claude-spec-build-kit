@@ -32,7 +32,7 @@ If CLAUDE.md does not exist, output exactly: `ERROR: CLAUDE.md not found — can
 
 ## Task
 1. Read CLAUDE.md.
-   Find the test command listed under its Commands section (an explicit "Test:" entry). Do not guess or substitute a different tool's command (e.g. assuming "npm test" for a non-Node project) — if no test command is listed, output exactly: `ERROR: no test command found in CLAUDE.md.` and stop.
+   Find the test command listed under its Commands section (the `test (all):` entry, or an explicit "Test:" entry). A command marked "(planned)" does not exist yet: treat it as missing. Do not guess or substitute a different tool's command (e.g. assuming "npm test" for a non-Node project) — if no test command is listed, output exactly: `ERROR: no test command found in CLAUDE.md.` and stop.
 
 2. Run the test command.
    Capture stdout and stderr.

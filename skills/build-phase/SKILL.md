@@ -44,10 +44,10 @@ Live state (verify these render; if they appear as literal text, run the git com
 
 ## Step 0 - Preconditions and snapshot
 - If $ARGUMENTS is empty, ask for the task and stop.
+- If the task is to write or update the PRD, ARCHITECTURE.md or CLAUDE.md, name the skill that owns that file (/spec-prd, /spec-arch, /spec-claudemd) and stop.
 - Run the guardrails setup before anything else.
 - Snapshot the starting state so the change can be validated without a commit. Run `git stash create`: it prints a hash that records the tracked files as they are now, without touching the working tree or index. BASE is that hash, or the output of `git rev-parse HEAD` when it prints nothing. Record BASE and the output of `git status --porcelain --untracked-files=all`.
 - Find commands: CLAUDE.md (Commands + Testing) first, then package scripts / Makefile / CI config. An unknown test command is a BLOCKING question. Never substitute a guess.
-- If REPO_ANALYSIS.md exists and its recorded commit matches or is close to HEAD, use it for recon. Otherwise ignore it.
 
 ## Step 1 - Recon (read-only)
 1. Locate the code involved. Read at least 2 sibling implementations and their tests.
@@ -60,7 +60,7 @@ Run the full test command (plus lint/typecheck if they exist) BEFORE editing. Re
 
 ## Step 3 - Task Brief + Test Plan (no approval gate)
 Write these in your reply before creating any file, so the user can follow the build:
-1. Task Brief: goal, in/out of scope (at least 3 out), ACs (AC-1..n, "The system shall ..."), assumptions with the default you chose, blocking questions. If $ARGUMENTS already contains ACs from /spec-interview or /spec-arch, reuse them verbatim.
+1. Task Brief: goal, in/out of scope (at least 3 out), ACs (AC-1..n, "The system shall ..."), assumptions with the default you chose, blocking questions. If $ARGUMENTS already contains ACs from /spec-interview, reuse them verbatim.
 2. Test Plan: apply the checklist. One row per category: APPLICABLE (scenarios -> test name -> level -> file) or N/A (reason grounded in the code).
 3. File tree: files to create/modify, each marked new/modified and "mirrors <existing file>".
 4. Anything beyond the ACs is SPECULATIVE: do not build it; list it in the report.
@@ -93,6 +93,8 @@ Run `git diff <BASE>`, read every new file, and check:
 - Every comment and docstring in the diff, and any unchanged one the change made wrong, is accurate and follows the Step 5 comment rules
 - Error paths and resource cleanup handled as surrounding code does
 - Callers of any changed signature updated (grep again)
+- Checklist category 9 holds claim by claim: each statement matches the code and the sources, none contradicts another, every closed set is complete. The reviewers check this next
+- Each problem you find here is fixed everywhere it occurs: grep for its siblings before moving on
 - Public contracts, schemas, config remain backward compatible; migrations reversible
 - Docs, types, changelog, API specs updated if the repo maintains them
 - Lint, format and type checks pass
@@ -107,7 +109,7 @@ e. If coverage tooling exists, check changed lines. Test each uncovered line or 
 f. Failures caused by this change: fix now. Do not proceed with new failures.
 
 ## Step 8 - Validate, fix, re-validate
-Run the validation loop with TASK = $ARGUMENTS verbatim, the brief's ACs, BASE, the file lists, the commands and the Step 2 baseline. Fix every MUST-FIX finding by following Steps 4-7, then re-validate. Stop when a round finds nothing to fix, or after 3 rounds.
+Run the validation loop with TASK = $ARGUMENTS verbatim, the brief's ACs, the confirmed answers (the brief's plus this run's), the sources (spec or source files the task or brief names), BASE, the file lists, the commands and the Step 2 baseline. Round 1 reuses the Step 7 results. Fix every MUST-FIX finding by following Steps 4-6, then re-check as the loop says. Stop when a round finds nothing to fix, or after 3 rounds.
 
 ## Step 9 - Report and stop
 Print exactly:

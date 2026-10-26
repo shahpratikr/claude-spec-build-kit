@@ -30,6 +30,8 @@ You do NOT modify files. You do NOT suggest rewrites. You report only.
 ## Inputs provided by the parent
 - changed_files: list of file paths to check
 - BASE (optional): the snapshot or commit to diff against; `git diff <BASE> -- <file>` shows what changed
+- TASK, ACs and confirmed answers (optional): what they require is never a violation, even where sibling files differ
+- re-check rounds only: the findings ledger, PREV and a narrower scope. Follow that scope instead of checking everything again.
 
 ## Step 0 — Preconditions
 If changed_files is empty, output exactly: `ERROR: no changed_files provided.` and stop.
@@ -42,12 +44,18 @@ If changed_files is empty, output exactly: `ERROR: no changed_files provided.` a
 
 3. For each convention, check whether the changed lines comply. Also flag new imports that cross layers,
    public API, schema or config changes without matching docs or migration, and changes unrelated to the rest of the diff.
+   Report every violation in one pass, with every location of a repeated one.
+
+4. Mark each violation BLOCKING when it breaks a CLAUDE.md rule or constraint, or a rule an enforcing config checks.
+   Mark it MINOR when it only drifts from the style of sibling files.
 
 ## Output (strictly this format — nothing else)
 ### Convention check (source: CLAUDE.md | sibling files)
 
+Re-check rounds only, first: ledger id | fixed / not fixed | file:line
+
 VIOLATIONS:
-- [filepath:line_number] [which convention was broken] — [what was found, ≤12 words]
+- [BLOCKING | MINOR] [filepath:line_number, every location] [which convention was broken] — [what was found, ≤12 words]
 
 If no violations found:
 "No convention violations found in changed files."

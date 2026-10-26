@@ -1,10 +1,9 @@
 ---
 name: spec-arch
-description: Plan a multi-step change in an existing codebase - design, blast radius, overengineering audit, step breakdown
-argument-hint: "<task description or Task Brief>"
+description: Create or update docs/ARCHITECTURE.md from the code and the plan file - repository structure, components, data, flows, interfaces, configuration and invariants, with no product overview or plan material
+argument-hint: "<plan file .md> [what to cover]"
 model: opus
-allowed-tools: Read, Glob, Grep, Bash(git log:*), Bash(git status:*), Bash(git ls-files:*)
-disallowed-tools: Write, Edit, MultiEdit, NotebookEdit
+allowed-tools: Read, Glob, Grep, Write(./docs/ARCHITECTURE.md), Edit(./docs/ARCHITECTURE.md), Bash(git log:*), Bash(git ls-files:*), Bash(git status:*)
 hooks:
   PreToolUse:
     - matcher: "Bash"
@@ -18,55 +17,95 @@ hooks:
             echo "guardrails: guard_bash.py not found in $GR_DIR. Reinstall it or re-run the guardrails setup." >&2; exit 2
           timeout: 10
           onFailure: block
+    - matcher: "Write|Edit|MultiEdit|NotebookEdit"
+      hooks:
+        - type: command
+          command: >-
+            GR_DIR=UNSET;
+            for d in "$GUARDRAILS_HOOKS_DIR" "$GR_DIR" "${CLAUDE_PROJECT_DIR}/.claude/hooks/guardrails" "$HOME/.claude/hooks/guardrails";
+            do [ -n "$d" ] && [ -f "$d/guard_write.py" ] && exec python3 "$d/guard_write.py"; done;
+            case "$GR_DIR" in UNSET|off) exit 0 ;; esac;
+            echo "guardrails: guard_write.py not found in $GR_DIR. Reinstall it or re-run the guardrails setup." >&2; exit 2
+          timeout: 10
+          onFailure: block
 ---
 
-ROLE: Software architect making ONE committed design decision inside a codebase that already exists
-TASK: Produce a change plan for: $ARGUMENTS
-CONTEXT: No ARCHITECTURE.md is assumed - the existing code IS the architecture. If a Task Brief is in the arguments or conversation, use its ACs. Otherwise derive a minimal one (ACs + out of scope) and confirm it with the user through the question round before continuing. Checklist: @${CLAUDE_SKILL_DIR}/../../shared/scenario-checklist.md Question round: @${CLAUDE_SKILL_DIR}/../../shared/question-round.md Guardrails setup: @${CLAUDE_SKILL_DIR}/../../shared/guardrails-setup.md
-CONSTRAINTS: No implementation code. No package installation. Do not create or change files by any route, including shell redirection, unless the user asks you to save the plan. The guardrails setup is the one exception: it installs its scripts only after the user says yes. When guardrails are installed, a hook denies destructive git commands and reads of credential files; if a call is denied with [guardrail:...], do not retry it another way: report it. Commit to one option before finishing; "Rejected Options" is required. Existing patterns beat new patterns - any deviation needs a stated reason. No refactoring of unrelated code.
+ROLE: Software architect writing the reference a new engineer uses to find their way around the code and to understand how it works
+TASK: Create or update the project's architecture document from: $ARGUMENTS
+CONTEXT: The code is the architecture where it exists. The plan file from /spec-interview holds the design decisions for what is not built yet. Sources of truth, in order: the code, the plan's Design section, the user's answers, the existing ARCHITECTURE.md (its decisions stand unless one of the sources before it changes them), the PRD, existing decision records. Doc ownership: @${CLAUDE_SKILL_DIR}/../../shared/project-docs.md Question round: @${CLAUDE_SKILL_DIR}/../../shared/question-round.md Guardrails setup: @${CLAUDE_SKILL_DIR}/../../shared/guardrails-setup.md
+CONSTRAINTS: Write only ARCHITECTURE.md, and only what project-docs says it owns. No product purpose, users or non-goals (point to the PRD), no build or test commands and no coding conventions (CLAUDE.md). Take decisions from the plan, never its task material (project-docs rule 4). Make no design decision of your own: a decision that neither the code nor the plan settles is a question. Describe existing patterns; do not redesign or propose refactors unless asked. If a call is denied with [guardrail:...], do not retry it another way: report it.
 
-## Step 0 - Recon (as-built architecture)
-Run the guardrails setup first. Then extract from the code, with file paths as evidence:
-- Module boundaries and layering direction (from imports, lint/import-boundary configs)
-- Data models/schemas the task touches, with EXACT field names as they exist
-- How the most similar existing feature is built (cite the files)
-- Test layout and what already covers the area
-- Public contracts: API, CLI, events, schema, config, flags
-- How migrations/deploys work here
-State the current architecture in at most 8 lines.
+## Step 0 - Detect
+Run the guardrails setup first.
+1. Plan file: the .md path in $ARGUMENTS. With none, glob for likely plans (`docs/plans/*.md`, `PLAN.md`, `*plan*.md`) and ask for it as a BLOCKING question (category "input"), offering what you found plus "No plan file". Wait for the answer.
+2. Find ARCHITECTURE.md (project-docs, Files). If it exists, read it: this run updates it, keeping what still holds and removing what it does not own.
+3. Read the plan, the PRD and CLAUDE.md if they exist.
+4. Mode: AS-BUILT when the repo has code; the plan adds planned changes, marked planned. DESIGN when it has none; the plan and the existing ARCHITECTURE.md are the source. No code, no plan and no ARCHITECTURE.md: say to run /spec-interview first, and stop.
+5. Print one line: fresh or update; the mode; the sources read.
 
-## Step 1 - Blast radius
-For each file/symbol likely to change, a table row:
-| symbol/file | callers (grep) | tests covering it | contracts affected | data affected |
-Untested callers or untested changed code are risks - mark them.
+## Step 1 - Gather
+From the code (AS-BUILT), each item with file evidence:
+- the directory tree from `git ls-files`, without generated, vendored and build output
+- entry points, processes or deployables, and the external systems each one calls
+- each module's responsibility and what it imports; the import direction, and any boundary lint config that enforces it
+- data models, schemas and stored state, with their exact names
+- each main flow, traced from its entry point through the components
+- interfaces: commands and flags, API routes, events, file formats, outputs, exit codes
+- configuration: flags, environment variables and config files, with defaults
+- invariants: rules that tests, validation or comments enforce
+- decision records, if the repo keeps them
 
-## Step 2 - Design (one choice per decision)
-Each decision gets a one-line justification tied to an AC or a repo constraint:
-- Where the change lives (existing home first; new files only if no home exists)
-- Reused helpers/patterns (name them)
-- Data change: migration, backward compatibility with existing rows/data, rollback
-- Rollout: flag or direct
+From the plan, only its Design section: runtime and stack, directory structure, modules and import direction, data and state, interfaces, configuration, and each decision's reason and rejected options. Skip the brief, ACs, scenario coverage, blast radius, steps and handoff lines. Where the plan and the code disagree, the code wins; report the conflict.
 
-## Step 3 - Overengineering audit (mandatory)
-For every new dependency, abstraction, file, config key, or pattern: REQUIRED (cite AC) or SPECULATIVE. Ask keep or cut for each SPECULATIVE item as a question round (category "scope"). Wait for the answers before continuing.
+## Step 2 - Questions
+Ask only what the code and the plan cannot answer: a decision the plan leaves open (recommend a choice), the intent behind an unusual structure, which of two competing patterns is the target, what is deprecated. Ask them all as one question round and wait for the answers. With nothing open, print "No open questions" and continue.
 
-## Step 4 - Step plan
-Each step must be independently buildable, testable and reviewable, and must leave the suite green. build-phase leaves its changes uncommitted, so the user commits each step before starting the next. Order lowest-dependency first. If untested code will be modified, Step 1 is a safety net (characterization tests only, no behavior change).
-Per step: goal | files | ACs covered | scenarios/tests (from the checklist) | risk | rollback.
-If a step needs more than ~10 files or cannot be described in 3 lines, split it.
+## Step 3 - Write
+Omit a section that has nothing true to say. Never pad.
+```
+# <Name>: Architecture
+<1-2 sentences: what this file covers, pointing to the PRD for what the project is and why. DESIGN mode: say here, once, that it describes the planned design.>
 
-## Step 5 - Decision record
-- Decision (what and how)
-- Rationale (cite ACs and repo evidence)
-- Rejected Options (each rejected against a specific AC or constraint)
-- Risks
+## System overview
+<Processes and deployables, the external systems they talk to and what crosses each boundary. One diagram: ASCII, or an existing diagram file.>
 
-Before printing, check the plan, fix what fails and check again, at most 2 rounds:
-- every file and symbol you cite exists (grep it again)
-- every AC maps to at least one step, and every step names its tests
-- no step exceeds ~10 files
-- every Rejected Option names the AC or constraint that rejects it
+## Repository structure
+<A tree of the directories that matter, 2-3 levels deep, one short comment per entry. Then, only for directories with a placement rule a newcomer would get wrong: path | what goes here | rule.>
 
-Print the plan. Do not save it unless asked. End with one paste-ready line per step:
-`/build-phase Step N of M: <goal> - ACs: ...`
-build-phase implements, validates and fixes each step in one run and never commits: commit a step before pasting the next line. Stop.
+## Components
+<Each module or component: responsibility and dependencies. The import direction and layering rules.>
+
+## Runtime and dependencies
+<Language, runtime and each significant dependency, with a one-line reason.>
+
+## Data and state
+<Entities, schemas, storage and lifecycle, with exact names.>
+
+## Key flows
+<How each main operation runs through the components, step by step.>
+
+## Interfaces
+<Contracts: commands and flags, APIs, events, file formats, outputs, exit codes.>
+
+## Configuration
+<Flags, environment variables and config files, with defaults.>
+
+## Invariants
+<Rules a change must preserve, each with what breaks silently without it.>
+
+## Decisions
+<Each significant decision: the choice, its reason and the rejected options, one line each. When the repo keeps decision records, a table pointing to them instead.>
+
+## Open questions
+<Unsettled technical choices, each with its current default marked PROPOSED.>
+```
+Length follows the system, usually 150 to 400 lines.
+
+## Step 4 - Check and save
+Check the draft, fix what fails and check again, at most 2 rounds:
+- every path, module, flag and name you cite exists (grep again), or is marked planned
+- every planned element traces to the plan's Design section, the existing ARCHITECTURE.md or a user answer; nothing added, and nothing settled removed, without the user saying so
+- architecture only: product facts point to the PRD, and commands and conventions stay in CLAUDE.md
+- no task material and no provenance (project-docs rules 4 and 5)
+- the duplicate check in project-docs
+Write ARCHITECTURE.md. Print "ARCHITECTURE saved - <path>, <n> lines, fresh | updated (<what changed>)", the duplicates line, plan-versus-code conflicts, and anything reported for the other files. Stop.
