@@ -47,7 +47,7 @@ Run the guardrails setup first.
 4. Premise check: verify every factual claim embedded in my wording ("since X is required later...") against the code or docs. If a premise is false or unverified, say so BEFORE anything else.
 
 ## Step 1 - Recon (before asking anything)
-Read what you need so that you never ask what the code already answers. Every claim about the code cites file:line and is tagged [Certain] (read it or ran it), [Likely] (strong inference) or [Guessing]. If most of it is guessing, say that first. Do not answer from memory of earlier turns.
+Read what you need so that you never ask what the code already answers. When ARCHITECTURE.md exists, read the sections that cover the area (CLAUDE.md, Project docs, says which); the invariants in CLAUDE.md bind any change. Every claim about the code cites file:line and is tagged [Certain] (read it or ran it), [Likely] (strong inference) or [Guessing]. If most of it is guessing, say that first. Do not answer from memory of earlier turns.
 
 ## Step 2 - Clarification round (mandatory in every mode)
 Goal: surface EVERY unresolved question now, in one round, so I answer once instead of discovering your assumptions in code later.
@@ -96,8 +96,8 @@ In every mode, before you print the result, re-open each file:line you cite and 
    - No AC, task or ticket ids and no wording relative to this change ("as today", "parity", "new", "rewrites the old test").
    - Check every comment the follow-up touches, and any unchanged one it made wrong, against the code.
    Before validating, check checklist category 9 claim by claim, and fix each problem everywhere it occurs, not only where you saw it.
-5. Verify: run the project's build/test/generate command (CLAUDE.md, then manifests/Makefile/CI; if unknown, ask - never guess). Show the command and its output. Update tests for changed behavior. For a comment-only change, prove no code changed: compare parse trees with comments and docstrings stripped.
-6. Validate: run the validation loop with TASK = my follow-up verbatim, ACs = the I-items you implemented written as "The system shall ...", the confirmed answers, the sources (spec or source files the follow-up names), BASE and your file lists. Round 1 reuses the Step 5 results. Fix every MUST-FIX finding the way you implemented, then re-check as the loop says, at most 3 rounds. Never commit: leave the changes for me to review.
+5. Verify: run the project's build/test/generate command (CLAUDE.md, then manifests/Makefile/CI; if unknown, ask - never guess). Show the command and its output. Update tests for changed behavior. Then run the can-fail pass, as the validation loop defines it, on the changed production lines. For a comment-only change, prove no code changed instead: compare parse trees with comments and docstrings stripped.
+6. Validate: run the validation loop with TASK = my follow-up verbatim, ACs = the I-items you implemented written as "The system shall ...", the confirmed answers, the sources (spec or source files the follow-up names), BASE, your file lists and the Step 5 results as the facts. Round 1 reuses them. Fix every MUST-FIX finding the way you implemented, then re-check as the loop says, at most 3 rounds. Never commit: leave the changes for me to review.
 
 ## Step 4 - Close-out (always print)
 ```

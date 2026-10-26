@@ -11,7 +11,7 @@ Claude Code skills and subagents for one-task-at-a-time engineering in an existi
 | `/build-phase <task>` | implement one task end to end: tests first, then independent review, fixes and re-review | code and tests, never committed |
 | `/followup explore: \| decide: \| implement: <text>` | answer, decide or change something in the middle of a session | only in implement mode |
 
-The subagents (`criteria-auditor`, `gap-hunter`, `convention-checker`) are the reviewers build-phase spawns. `test-reporter` and `spec-validator` are standalone helpers.
+The subagents (`criteria-auditor`, `gap-hunter`, `convention-checker`) are the reviewers build-phase spawns. Two standalone helpers: `test-reporter` runs the test command from `CLAUDE.md`, and `spec-validator` checks changed files against the ACs of one step of a plan file.
 
 ## Requirements
 
@@ -89,12 +89,13 @@ What the guardrails do, at every tool call:
 - **Deny:**
   - destructive git: `reset --hard`, `checkout --`, `restore`, `clean -f`, `stash drop`;
   - `git add -A` and force pushes;
-  - recursive `rm` of `/`, `~` or `.`;
+  - recursive `rm` of `/`, `~`, `.` or a folder that holds your home folder, including through a variable or `cd` earlier in the command;
   - `curl ... | sh`;
-  - reading `.env` files, SSH private keys or cloud credentials;
+  - reading `.env` files, SSH private keys or cloud credentials through Bash. The Read tool isn't hooked: to cover it too, add the `permissions.deny` rules from `shared/guardrails/settings.example.json` to your settings;
   - writing a credential into any file;
   - editing Claude Code's own settings or hooks.
 - **Ask you first:** every `git commit`, adding a new dependency (`npm install <pkg>`, `pip install <pkg>`, `go get`, ...), and other recursive deletes.
+- **Let through:** recursive deletes at least two levels inside the temp folder, such as a session scratchpad or a `mktemp -d` folder, so reviewers' probe and snapshot folders never wait for a click.
 
 Hooks run outside the model, so a prompt can't talk its way past them. They match command text, though, so they are a strong default rather than a sandbox. For an OS-level boundary, also turn on Claude Code's `/sandbox`.
 
@@ -106,15 +107,17 @@ Optional: to guard sessions that never use these skills, merge `shared/guardrail
 - `/spec-interview` writes the plan, at the path you name: ACs, design decisions, steps and `/build-phase` lines. If you don't name a path, it asks.
 - `/spec-prd` writes `docs/PRD.md`: what the project is, for whom and why. It has no directory structure, design or plan.
 - `/spec-arch <plan.md>` writes `docs/ARCHITECTURE.md` from the code and the plan's design decisions.
-- `/spec-claudemd <plan.md>` writes `CLAUDE.md` from the code, the plan and the two docs: the commands, test rules, conventions and constraints the other skills read.
+- `/spec-claudemd <plan.md>` writes `CLAUDE.md` from the code, the plan and the two docs: the commands, test rules, conventions, invariants and constraints the other skills read.
 
-For a new project, run them in that order. Each one updates its own file in place on later runs. The docs take decisions from the plan, never its ACs, steps or `/build-phase` lines, and `CLAUDE.md` never imports the plan, because a plan goes stale when its task ends. `shared/project-docs.md` decides which file owns which fact.
+For a new project, run them in that order. Each one updates its own file in place on later runs. The docs take decisions from the plan, never its ACs, steps or `/build-phase` lines, and never mention the plan, because a plan goes stale when its task ends. `shared/project-docs.md` decides which file owns which fact.
+
+`CLAUDE.md` is enough to make a change on its own, and it imports nothing. An `@` import would load the whole PRD and ARCHITECTURE.md into every session. So `CLAUDE.md` holds the rules every change must keep (invariants, import direction, where new files go) and names the two docs by path, with the section to read for each code area. ARCHITECTURE.md explains how the code is built and why.
 
 A typical task:
 
 1. `/spec-claudemd` once, if the repository has no `CLAUDE.md`. build-phase reads the test command from it.
 2. `/spec-interview <task> <plan.md>` asks every question the code can't answer, writes the plan file, and prints a ready-to-paste `/build-phase ...` line, or one `/build-phase Step N of M ...` line per step for a bigger change.
-3. Paste the `/build-phase` line. It runs to the end without approvals and stops only for questions it can't settle from the code.
+3. Paste the `/build-phase` line. It runs to the end without approvals and stops only for questions it can't settle from the code. A task of more than about 10 production files stops at a question first and offers a `/spec-interview` line to split it: every review round re-reads the whole change, so a 100-file run takes hours.
 4. Review the change and commit it yourself. For multi-step plans, commit each step before starting the next.
 5. `/followup` for anything that comes up mid-session. `implement:` changes go through the same review loop as build-phase.
 
@@ -124,13 +127,14 @@ A typical task:
 
 1. Snapshots the working tree without touching it (`git stash create`), so the change can be reviewed with no commit. Files you had already modified stay off-limits.
 2. Recon, then a baseline run of tests, lint and typecheck. Existing failures are recorded, not fixed.
-3. Prints a Task Brief and test plan, then writes failing tests first and implements until they pass.
-4. Runs a validation loop of at most 3 rounds. Round 1 is a full review by three read-only reviewers in parallel:
+3. Prints a Task Brief and test plan, applies the size gate, then writes failing tests first and implements until they pass.
+4. Runs a can-fail pass: it breaks each changed condition, boundary and guard one at a time and checks that a test fails. Each surviving break gets a test, or a recorded reason why it can't change behavior.
+5. Runs a validation loop of at most 3 rounds. Round 1 is a full review by three read-only reviewers in parallel:
    - `criteria-auditor`: is every AC implemented, tested and verifiable, and did anything in the task go missing?
-   - `gap-hunter`: every untested scenario, defect and contradiction, with no cap on findings;
-   - `convention-checker`: project conventions, each violation marked BLOCKING or MINOR.
-   Reviewers see the task, your confirmed answers and the diff, never the builder's reasoning. Each MUST-FIX finding gets a failing test and a fix, applied everywhere the same problem occurs. Later rounds are re-checks: only the reviewers the fixes need run, and they confirm the fixes and review what the fixes changed, instead of reviewing everything again.
-5. Prints a report with these parts:
+   - `gap-hunter`: every untested scenario, defect and contradiction, with no cap on findings. It proves suspected defects with small probe scripts in the scratchpad;
+   - `convention-checker`: project conventions and invariants, each violation marked BLOCKING or MINOR.
+   Reviewers see the task, your confirmed answers, the diff and the test and can-fail results, never the builder's reasoning. They never re-run the suite. Each MUST-FIX finding gets a failing test and a fix, applied everywhere the same problem occurs. Later rounds are re-checks. build-phase confirms each fix with evidence (a passing test, a clean search), then spawns `gap-hunter` on what the fixes changed. It adds the other two reviewers only when an AC changed, a file was created, or a fix couldn't be confirmed.
+6. Prints a report with these parts:
    - the verdict, `PASS` or `NEEDS REVIEW`;
    - the AC-to-test map and test results;
    - each validation round;
@@ -138,7 +142,7 @@ A typical task:
    - `git diff <BASE>` to review the change, a one-line undo command, and a suggested commit message.
    It never stages, commits, pushes or switches branches.
 
-**Cost.** build-phase runs on opus and its reviewers on sonnet; with the fallback setting, on sonnet whenever opus is unavailable. Round 1 spawns three reviewers and later rounds only the ones the fixes need, so a hard task can take several minutes. Change the `model:` lines in the skill and agent files if that trade-off doesn't suit you.
+**Cost.** build-phase runs on opus and its reviewers on sonnet; with the fallback setting, on sonnet whenever opus is unavailable. Round 1 spawns three reviewers and later rounds usually only `gap-hunter`, so a hard task can take several minutes. The size of the change drives the cost most: keep each run within the size gate. Change the `model:` lines in the skill and agent files if that trade-off doesn't suit you.
 
 ## Updating
 
@@ -147,6 +151,8 @@ Pull the repository and copy the folders again, as in Install. Re-copying resets
 - if you chose a folder of your own, the next guarded skill asks again. Give it the same folder; the scripts are refreshed in place.
 
 Copying never deletes. Remove skills the repository no longer ships by hand: `rm -r ~/.claude/skills/{analyze-repo,validate-phase}`.
+
+A `CLAUDE.md` written by an older spec-claudemd `@`-imports the PRD and ARCHITECTURE.md, and its invariants still sit in ARCHITECTURE.md. To move them, run `/spec-claudemd <plan.md>`, then `/spec-arch <plan.md>`.
 
 ## Uninstall
 
@@ -177,9 +183,9 @@ To see the guardrails' decisions, read `guardrail-hooks.jsonl` in the `logs/` fo
 | Path | What it is |
 | --- | --- |
 | `skills/<name>/SKILL.md` | the six skills |
-| `agents/*.md` | the subagents; reviewers have no write tools, and their Bash is limited to read-only commands |
+| `agents/*.md` | the subagents; reviewers have no write tools and never change the repository. gap-hunter's probe scripts go in the scratchpad |
 | `shared/scenario-checklist.md` | test-scenario categories used by build-phase, followup, the reviewers and spec-interview |
-| `shared/validation-loop.md` | the review, fix and re-review procedure used by build-phase and followup |
+| `shared/validation-loop.md` | the can-fail pass and the review, fix and re-review procedure used by build-phase and followup |
 | `shared/project-docs.md` | which of the plan file, `PRD.md`, `ARCHITECTURE.md` and `CLAUDE.md` owns each kind of fact, used by the four spec skills |
 | `shared/question-round.md` | how every skill asks questions: the picker, the recommended-first order and the text fallback |
 | `shared/guardrails-setup.md` | the first-run guardrails questions |

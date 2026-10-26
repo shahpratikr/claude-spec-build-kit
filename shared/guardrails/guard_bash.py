@@ -17,6 +17,7 @@ import os
 import re
 import shlex
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _guardrail_common import emit_pretooluse, log_decision, read_payload
@@ -40,7 +41,7 @@ RULES: list[tuple[str, str, str, str]] = [
     ("pipe-to-interpreter", r"\b(?:curl|wget)\b[^|;&]*\|\s*(?:sudo\s+)?(?:(?:ba|z|da|k)?sh|python3?|perl|ruby|node)\b", DENY,
      "Piping a download straight into an interpreter runs unreviewed remote code."),
     ("git-commit-needs-human", GIT + r"commit\b", ASK,
-     "Commits need a human click (build-phase Gate 2)."),
+     "Commits need a human click."),
     ("git-push-force", GIT + r"push\b.*(?:\s--force(?:-with-lease)?\b|\s-[a-z]*f\b|\s\+\S)", DENY,
      "Force-pushing rewrites shared history. Push normally, or ask the user to do it."),
     ("read-secret-file",
@@ -55,12 +56,14 @@ RULES: list[tuple[str, str, str, str]] = [
      r"|\bgo\s+get\b|\bgo\s+install\s+\S+@"
      r"|\bgem\s+install\b|\bcomposer\s+require\b"
      r"|\b(?:brew|apt|apt-get|yum|dnf|apk)\s+(?:install|add)\b",
-     ASK, "Adding a dependency or package needs approval (build-phase Gate 1)."),
+     ASK, "Adding a dependency or package needs a human click."),
 ]
 
 CATASTROPHIC_TARGETS = {"/", "/*", "~", "~/", "~/*", "$home", "${home}", ".", "./", "./*", "..", "../", "*"}
-WRAPPERS = {"sudo", "env", "command", "exec", "nohup", "time", "xargs"}
+WRAPPERS = {"sudo", "env", "command", "exec", "nohup", "time", "xargs", "export"}
 SHELLS = {"sh", "bash", "zsh", "dash"}
+ASSIGNMENT = re.compile(r"^([A-Za-z_]\w*)=(.*)$", re.S)
+VARIABLE = re.compile(r"\$(?:\{(\w+)\}|(\w+))")
 
 
 def normalize(command: str) -> str:
@@ -70,41 +73,117 @@ def normalize(command: str) -> str:
     return re.sub(r"\s+", " ", text).strip().lower()
 
 
-def check_rm(command: str) -> tuple[str, str, str] | None:
-    """Recursive rm: deny catastrophic targets, ask for everything else."""
+def expand(word: str, env: dict[str, str | None]) -> str | None:
+    """Expand ~ and $VAR as the shell would, or return None when the value can't be known from the command text."""
+    if "$(" in word or "`" in word:
+        return None
+    if word == "~" or word.startswith("~/"):
+        word = os.path.expanduser("~") + word[1:]
+    unknown = False
+
+    def value(m: re.Match) -> str:
+        nonlocal unknown
+        name = m.group(1) or m.group(2)
+        found = env.get(name) if name in env else (os.path.expanduser("~") if name == "HOME" else None)
+        unknown = unknown or found is None
+        return found or ""
+
+    word = VARIABLE.sub(value, word)
+    return None if unknown or "$" in word else word
+
+
+def resolve(target: str, env: dict[str, str | None], cwd: str | None) -> str | None:
+    word = expand(target, env)
+    if word is None or ("{" in word and ".." in word):
+        return None
+    if not os.path.isabs(word):
+        if cwd is None:
+            return None
+        word = os.path.join(cwd, word)
+    return os.path.realpath(word)
+
+
+def inside_temp(path: str) -> bool:
+    """Two levels deep in a temp root (a scratchpad, a mktemp folder): the root and its direct children stay protected."""
+    for root in {os.path.realpath(tempfile.gettempdir()), os.path.realpath("/tmp")}:
+        rel = os.path.relpath(path, root)
+        if rel != ".." and not rel.startswith(".." + os.sep) and len(rel.split(os.sep)) >= 2:
+            return True
+    return False
+
+
+def is_catastrophic(path: str) -> bool:
+    home = os.path.realpath(os.path.expanduser("~"))
+    return path == "/" or home == path or home.startswith(path.rstrip("/") + "/")
+
+
+def check_rm(command: str, cwd: str | None = None) -> tuple[str, str, str] | None:
+    """Recursive rm: deny catastrophic targets, allow targets inside a temp folder, ask for everything else.
+
+    Variables assigned and folders entered with cd earlier in the same command are followed, so
+    `S=/tmp/x/scratchpad; rm -rf $S/out` and `cd /tmp/x/scratchpad && rm -rf out` resolve to real paths.
+    """
+    env: dict[str, str | None] = {}
+    hits = []
     for segment in re.split(r"&&|\|\||;|\||\n", command):
         try:
             tokens = shlex.split(segment)
         except ValueError:
             tokens = segment.split()
-        while tokens and (re.match(r"^\w+=", tokens[0]) or os.path.basename(tokens[0]) in WRAPPERS):
+        from_stdin = False
+        while tokens and (ASSIGNMENT.match(tokens[0]) or os.path.basename(tokens[0]).lower() in WRAPPERS):
+            assignment = ASSIGNMENT.match(tokens[0])
+            if assignment:
+                env[assignment.group(1)] = expand(assignment.group(2), env)
+            from_stdin = from_stdin or os.path.basename(tokens[0]) == "xargs"
             tokens = tokens[1:]
+        if from_stdin:
+            names = [os.path.basename(t).lower() for t in tokens]
+            tokens = tokens[names.index("rm"):] if "rm" in names else []
         if not tokens:
             continue
-        if os.path.basename(tokens[0]) in SHELLS and "-c" in tokens:
+        head = os.path.basename(tokens[0]).lower()
+        if head == "cd":
+            target = expand(tokens[1], env) if len(tokens) > 1 else os.path.expanduser("~")
+            if target is None or target == "-" or (cwd is None and not os.path.isabs(target)):
+                cwd = None
+            else:
+                cwd = os.path.normpath(os.path.join(cwd or "/", target))
+            continue
+        if head in SHELLS and "-c" in tokens:
             inner = tokens[tokens.index("-c") + 1:]
-            nested = check_rm(" ".join(inner)) if inner else None
+            nested = check_rm(" ".join(inner), cwd) if inner else None
             if nested:
-                return nested
+                hits.append(nested)
             continue
-        if os.path.basename(tokens[0]) != "rm":
+        if head != "rm":
             continue
-        flags = [t for t in tokens[1:] if t.startswith("-")]
-        targets = [t for t in tokens[1:] if not t.startswith("-")]
-        recursive = any(f == "--recursive" or (not f.startswith("--") and "r" in f) for f in flags)
-        if not recursive:
+        args = tokens[1:]
+        split = args.index("--") if "--" in args else len(args)
+        flags = [t for t in args[:split] if t.startswith("-")]
+        targets = [t for t in args[:split] if not t.startswith("-")] + args[split + 1:]
+        if not any(f == "--recursive" or (not f.startswith("--") and "r" in f.lower()) for f in flags):
             continue
-        if not targets or any(t in CATASTROPHIC_TARGETS for t in targets):
-            return DENY, "rm-recursive-catastrophic", f"Refusing recursive delete of {' '.join(targets) or '(nothing)'}."
-        return ASK, "rm-recursive", f"Recursive delete of {' '.join(targets)}: a human must confirm."
-    return None
+        if (not targets and not from_stdin) or any(t.lower() in CATASTROPHIC_TARGETS for t in targets):
+            hits.append((DENY, "rm-recursive-catastrophic", f"Refusing recursive delete of {' '.join(targets) or '(nothing)'}."))
+            continue
+        paths = [resolve(t, env, cwd) for t in targets]
+        if any(p is not None and is_catastrophic(p) for p in paths):
+            hits.append((DENY, "rm-recursive-catastrophic", f"Refusing recursive delete of {' '.join(targets)}: it reaches / or your home folder."))
+        elif from_stdin or any(p is None or not inside_temp(p) for p in paths):
+            shown = " ".join(targets) or "paths read from stdin"
+            hits.append((ASK, "rm-recursive", f"Recursive delete of {shown}: a human must confirm."))
+    if not hits:
+        return None
+    hits.sort(key=lambda h: 0 if h[0] == DENY else 1)
+    return hits[0]
 
 
-def decide(command: str) -> tuple[str, str, str] | None:
+def decide(command: str, cwd: str | None = None) -> tuple[str, str, str] | None:
     """Return (decision, rule_id, message) for the strictest matching rule, or None."""
     norm = normalize(command)
     hits = [(decision, rule_id, msg) for rule_id, rx, decision, msg in RULES if re.search(rx, norm)]
-    rm_hit = check_rm(command.lower())
+    rm_hit = check_rm(command, cwd)
     if rm_hit:
         hits.append(rm_hit)
     if not hits:
@@ -115,13 +194,13 @@ def decide(command: str) -> tuple[str, str, str] | None:
 
 def main() -> int:
     if len(sys.argv) >= 3 and sys.argv[1] == "--dry-run":
-        result = decide(" ".join(sys.argv[2:]))
+        result = decide(" ".join(sys.argv[2:]), os.getcwd())
         print(f"{result[0]:<5} {result[1]}: {result[2]}" if result else "pass  (no rule matched; normal permission flow decides)")
         return 0
     try:
         payload = read_payload()
         command = (payload.get("tool_input") or {}).get("command", "")
-        result = decide(command)
+        result = decide(command, payload.get("cwd") or None)
         if result is None:
             log_decision("guard_bash", payload, "pass", detail=command)
             return 0

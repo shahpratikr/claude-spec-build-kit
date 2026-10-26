@@ -48,7 +48,7 @@ If $ARGUMENTS is empty, ask for the task and stop. If the task is to write or up
 7. Identify stack, test framework, test command (CLAUDE.md, then manifests/CI).
 8. `git log -5 --stat -- <area>`: recent changes, and any earlier plans in commit bodies.
 9. Grep for callers of anything likely to change.
-10. Layering and import direction (from imports and boundary lint configs), the public contracts the task touches (API, CLI, events, schema, config, flags), and the exact names of the data models it touches.
+10. Layering and import direction (from imports and boundary lint configs), the invariants in CLAUDE.md the change must keep, the public contracts the task touches (API, CLI, events, schema, config, flags), and the exact names of the data models it touches.
 In a new project with no code, items 5 to 10 are "N/A: no code yet", and the design decisions in Step 3 are yours to settle with the user.
 Report 3-6 lines: what exists, what already has tests, what looks risky. Every claim about the code cites file:line and is tagged [Certain] (read it or ran it), [Likely] (strong inference) or [Guessing]. If most of it is guessing, say that first.
 
@@ -71,7 +71,7 @@ Discovery checklist:
 6. Non-functional - performance, security and permissions, observability.
 7. Verification - how each AC is tested, what "done" means, which commands prove it.
 8. Conventions and constraints - existing patterns to follow, comment and style rules, things not to touch.
-9. Design, for a new project or subsystem - runtime and stack, directory structure, modules, data and state, interfaces, configuration, and the commands to build and test.
+9. Design, for a new project or subsystem - runtime and stack, directory structure, modules, data and state, interfaces, configuration, the invariants every change must keep, and the commands to build and test.
 
 ### After the user's answers
 Follow "After the answers" in the question round, then continue to Step 2.
@@ -104,7 +104,7 @@ Print one line saying what the check changed, or "self-check: no changes".
 ## Step 3 - Design and steps
 1. Design, one choice per decision, each with a one-line reason tied to an AC, a PRD fact or a repo constraint, and the options it rejects:
    - always: where the change lives (existing home first, new files only if no home exists); helpers and patterns reused (name them); data change (migration, compatibility with existing data, rollback); rollout (flag or direct);
-   - for a new project or subsystem, also: runtime and stack; directory structure, as a tree; modules and import direction; data and state; interfaces; configuration and defaults; the build, test, lint and run commands. spec-arch and spec-claudemd take these from the plan, so leave none implicit.
+   - for a new project or subsystem, also: runtime and stack; directory structure, as a tree; modules and import direction; data and state; interfaces; configuration and defaults; the invariants every change must keep; the build, test, lint and run commands. spec-arch and spec-claudemd take these from the plan, so leave none implicit.
 2. Blast radius, existing code only, one row per file or symbol likely to change:
    | symbol/file | callers (grep) | tests covering it | contracts affected | data affected |
    Mark untested callers and untested changed code as risks.

@@ -52,8 +52,9 @@ Live state (verify these render; if they appear as literal text, run the git com
 ## Step 1 - Recon (read-only)
 1. Locate the code involved. Read at least 2 sibling implementations and their tests.
 2. Grep for callers of everything you may change.
-3. Identify layering/import direction, naming and placement patterns, error-handling and logging style, public contracts touched.
+3. Identify layering/import direction, naming and placement patterns, error-handling and logging style, public contracts touched. The invariants in CLAUDE.md bind the change.
 4. `git log -5 -- <area>`: recent changes and any earlier Task Briefs in commit bodies.
+5. If ARCHITECTURE.md exists, read the sections that cover the code you will change (CLAUDE.md, Project docs, says which).
 
 ## Step 2 - Baseline
 Run the full test command (plus lint/typecheck if they exist) BEFORE editing. Record pass/fail counts and the names of failing tests: these are pre-existing failures and are NOT yours to fix. If any overlap the area you will change, note it in the brief. If the suite is very slow, run the area subset and say so.
@@ -64,6 +65,7 @@ Write these in your reply before creating any file, so the user can follow the b
 2. Test Plan: apply the checklist. One row per category: APPLICABLE (scenarios -> test name -> level -> file) or N/A (reason grounded in the code).
 3. File tree: files to create/modify, each marked new/modified and "mirrors <existing file>".
 4. Anything beyond the ACs is SPECULATIVE: do not build it; list it in the report.
+5. Size gate. Every review round re-reads the whole change, so one run builds at most about 10 production files. When the file tree has more, or the repository has no code yet and the task is more than its skeleton, ask one BLOCKING question (category "scope"), even though it is not about intent. The options are "Split it with /spec-interview (Recommended)", described with the file count, and "Build it all in one run", described as taking hours of review. On split, print the count and a ready line, `/spec-interview <task> docs/plans/<task-slug>.md`, and stop. A "Step N of M" task from a plan is gated the same way.
 Ask any BLOCKING question now (see QUESTIONS), then continue. Do not wait for approval.
 
 ## Step 4 - Tests first
@@ -104,12 +106,12 @@ Fix problems before testing.
 a. New tests pass.
 b. Full suite + lint + typecheck (+ build if it exists). Compare with the Step 2 baseline: no NEW failures. Pre-existing failures are reported, not fixed.
 c. If new tests involve time, async, concurrency or randomness, run them 3 times.
-d. Can-fail check: if a mutation tool exists (from manifests/CLAUDE.md), run it on changed files. Otherwise pick the 2-3 most important branches, make a one-line temporary break via str_replace, confirm a test fails, revert that exact edit, and re-run to confirm green. Report each.
+d. Can-fail pass: run it on every changed production line, as the validation loop defines it, once. Kill each survivor with a test, or record why it cannot change behavior.
 e. If coverage tooling exists, check changed lines. Test each uncovered line or justify it.
 f. Failures caused by this change: fix now. Do not proceed with new failures.
 
 ## Step 8 - Validate, fix, re-validate
-Run the validation loop with TASK = $ARGUMENTS verbatim, the brief's ACs, the confirmed answers (the brief's plus this run's), the sources (spec or source files the task or brief names), BASE, the file lists, the commands and the Step 2 baseline. Round 1 reuses the Step 7 results. Fix every MUST-FIX finding by following Steps 4-6, then re-check as the loop says. Stop when a round finds nothing to fix, or after 3 rounds.
+Run the validation loop with TASK = $ARGUMENTS verbatim, the brief's ACs, the confirmed answers (the brief's plus this run's), the sources (spec or source files the task or brief names), BASE, the file lists, the commands, the Step 2 baseline and the Step 7 results as the facts. Round 1 reuses them, the can-fail pass included. Fix every MUST-FIX finding by following Steps 4-6, then re-check as the loop says. Stop when a round finds nothing to fix, or after 3 rounds.
 
 ## Step 9 - Report and stop
 Print exactly:
@@ -117,10 +119,11 @@ Print exactly:
 Build complete. Nothing was staged or committed.
 Verdict: [PASS | NEEDS REVIEW] after [N] validation round(s)
 Files: created [...] / modified [...]
+Size gate: [n production files | over the gate, built in one run at the user's choice]
 AC -> tests: AC-1 -> [test names] ...
 Scenario categories: APPLICABLE n / N/A n  (list each N/A with its reason)
 Tests: baseline [pass/fail] -> now [pass/fail]; pre-existing failures untouched: [names]; lint/typecheck/build: [results | none]
-Can-fail check: [results]
+Can-fail: [per round: breaks run, killed, survivors left open with the reason | none]
 Validation: [one line per round, from the validation loop]
 Dismissed findings: [finding -> evidence file:line | none]
 Needs your decision: [open items | none]
