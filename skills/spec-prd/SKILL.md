@@ -2,7 +2,8 @@
 name: spec-prd
 description: Create or update docs/PRD.md - the project overview and context (purpose, users, scope, flow, constraints), with no requirements, plans or architecture
 argument-hint: "[source files or notes about the project]"
-model: opus
+model: sonnet
+effort: high
 allowed-tools: Read, Glob, Grep, Write(./docs/PRD.md), Edit(./docs/PRD.md), Bash(git log:*), Bash(git ls-files:*), Bash(git status:*)
 hooks:
   PreToolUse:

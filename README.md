@@ -11,7 +11,19 @@ Claude Code skills and subagents for one-task-at-a-time engineering in an existi
 | `/build-phase <task>` | implement one task end to end: tests first, then independent review, fixes and re-review | code and tests, never committed |
 | `/followup explore: \| decide: \| implement: <text>` | answer, decide or change something in the middle of a session | only in implement mode |
 
-The subagents (`criteria-auditor`, `gap-hunter`, `convention-checker`) are the reviewers build-phase spawns. Two standalone helpers: `test-reporter` runs the test command from `CLAUDE.md`, and `spec-validator` checks changed files against the ACs of one step of a plan file.
+The subagents are the read-only reviewers that build-phase and followup spawn: `criteria-auditor`, `gap-hunter` and `convention-checker` in round 1, and `gap-rechecker` in re-check rounds.
+
+### Which skill when
+
+| You want to | Use |
+| --- | --- |
+| understand code, or weigh a tradeoff | `/followup explore: ...` or `/followup decide: ...` |
+| change 1-3 files | `/followup implement: ...` |
+| build a feature or a multi-file change | `/spec-interview`, then one `/build-phase` line per step, each in a fresh session |
+| write or refresh the project docs | `/spec-prd`, `/spec-arch`, `/spec-claudemd` |
+| analysis, writing or research outside a code repository | no skill: these skills assume a git repository with tests |
+
+Start Claude Code in the repository root. Claude Code loads `CLAUDE.md`, project settings and memory from the session folder, and the hooks treat that folder as the project. build-phase and followup warn when the session started outside the repository, then continue with `git -C`.
 
 ## Requirements
 
@@ -55,7 +67,7 @@ Then start a new Claude Code session.
 
 Then a skill or reviewer whose model is unavailable or overloaded runs on sonnet instead of failing. Claude Code tries the original model again at the start of your next turn.
 
-**Turn fork mode off.** build-phase waits for its three reviewers. In interactive sessions (terminal, VS Code, desktop app), Claude can only wait for a subagent when fork mode is off. If it can't wait, the reviewers' reports arrive later as new turns. The rest of the build then runs without the skill's tool pre-approvals, so you get permission prompts, and on your default model instead of the skill's.
+**Turn fork mode off.** This setting matters most. build-phase waits for its reviewers. In interactive sessions (terminal, VS Code, desktop app), Claude can only wait for a subagent when fork mode is off. If it can't wait, the reviewers' reports arrive later as new turns. The rest of the build then runs without the skill's tool pre-approvals, so you get permission prompts, and on your default model and effort instead of the skill's. Measured on 19 builds with fork mode on: every one left the skill at the first reviewer hand-back or background notification, and 35-45% of each build ran outside it. The skills also never run commands in the background, for the same reason.
 
 To turn fork mode off, add this to `~/.claude/settings.json`:
 
@@ -119,7 +131,7 @@ A typical task:
 2. `/spec-interview <task> <plan.md>` asks every question the code can't answer, writes the plan file, and prints a ready-to-paste `/build-phase ...` line, or one `/build-phase Step N of M ...` line per step for a bigger change.
 3. Paste the `/build-phase` line. It runs to the end without approvals and stops only for questions it can't settle from the code. A task of more than about 10 production files stops at a question first and offers a `/spec-interview` line to split it: every review round re-reads the whole change, so a 100-file run takes hours.
 4. Review the change and commit it yourself. For multi-step plans, commit each step before starting the next.
-5. `/followup` for anything that comes up mid-session. `implement:` changes go through the same review loop as build-phase.
+5. `/followup` for anything that comes up mid-session. `implement:` changes go through the same review loop as build-phase. It edits files without asking, but its Bash is limited to git commands, so Claude Code asks before it runs your test command or the can-fail script.
 
 **Questions.** Every skill asks through Claude Code's question picker: up to 4 questions per dialog, blocking ones first, with the recommended answer listed first. Choose "Other" to type your own answer. Keep-or-cut lists arrive as checkboxes, and a question that depends on another answer waits for the next dialog. Only open input with no likely answers, such as the task itself, is asked in plain text. Answers carry across skills in the same session, so nothing is asked twice. Where the picker isn't available, such as in `claude -p`, the skill prints the questions as text and waits for a reply like `defaults` or `defaults except Q3=B`.
 
@@ -127,13 +139,15 @@ A typical task:
 
 1. Snapshots the working tree without touching it (`git stash create`), so the change can be reviewed with no commit. Files you had already modified stay off-limits.
 2. Recon, then a baseline run of tests, lint and typecheck. Existing failures are recorded, not fixed.
-3. Prints a Task Brief and test plan, applies the size gate, then writes failing tests first and implements until they pass.
+3. Prints a Task Brief and test plan, including a table of the input variants each changed format must handle and a pre-mortem per AC. Then it applies the size gate, writes failing tests first and implements until they pass.
 4. Runs a can-fail pass: it breaks each changed condition, boundary and guard one at a time and checks that a test fails. Each surviving break gets a test, or a recorded reason why it can't change behavior.
-5. Runs a validation loop of at most 3 rounds. Round 1 is a full review by three read-only reviewers in parallel:
+5. Runs a validation loop of at most 3 rounds. Round 1 is a full review. A small change (at most 3 files and 80 lines) gets `gap-hunter` alone; anything larger gets three read-only reviewers in parallel:
    - `criteria-auditor`: is every AC implemented, tested and verifiable, and did anything in the task go missing?
    - `gap-hunter`: every untested scenario, defect and contradiction, with no cap on findings. It proves suspected defects with small probe scripts in the scratchpad;
    - `convention-checker`: project conventions and invariants, each violation marked BLOCKING or MINOR.
-   Reviewers see the task, your confirmed answers, the diff and the test and can-fail results, never the builder's reasoning. They never re-run the suite. Each MUST-FIX finding gets a failing test and a fix, applied everywhere the same problem occurs. Later rounds are re-checks. build-phase confirms each fix with evidence (a passing test, a clean search), then spawns `gap-hunter` on what the fixes changed. It adds the other two reviewers only when an AC changed, a file was created, or a fix couldn't be confirmed.
+   Reviewers see the task, your confirmed answers, the diff and the test and can-fail results, never the builder's reasoning, variant table or fix plans. They never re-run the suite.
+   Before any fix, build-phase writes a fix plan: one entry per MUST-FIX finding, with the root cause, every sibling location, the variants, the callers at risk, the failing tests and a pre-mortem. It checks the plan against the code, corrects what is missing, malformed or wrong, prints a `fix-plan check` line, and only then edits.
+   Round 2 re-checks. build-phase confirms each fix with evidence (a passing test, a clean search), then spawns `gap-rechecker` on what the fixes changed. It adds the other two reviewers only when an AC changed, a file was created, or a fix couldn't be confirmed. Round 3 runs only when round 2 found a HIGH, overturned a confirmation, or left a production fix it can't prove with a test and killed breaks. After the last review, no production code changes, so nothing reaches you unreviewed.
 6. Prints a report with these parts:
    - the verdict, `PASS` or `NEEDS REVIEW`;
    - the AC-to-test map and test results;
@@ -142,7 +156,27 @@ A typical task:
    - `git diff <BASE>` to review the change, a one-line undo command, and a suggested commit message.
    It never stages, commits, pushes or switches branches.
 
-**Cost.** build-phase runs on opus and its reviewers on sonnet; with the fallback setting, on sonnet whenever opus is unavailable. Round 1 spawns three reviewers and later rounds usually only `gap-hunter`, so a hard task can take several minutes. The size of the change drives the cost most: keep each run within the size gate. Change the `model:` lines in the skill and agent files if that trade-off doesn't suit you.
+### Models, effort and cost
+
+Opus where a skill writes code, makes design decisions, or writes a file every later session relies on. Sonnet where the work is checking against explicit rules or turning given sources into prose. Both `model:` and `effort:` in the frontmatter are honored: a skill's values override the session's for as long as the run stays inside the skill.
+
+| File | Model | Effort |
+| --- | --- | --- |
+| build-phase | opus | session default (target: high, see below) |
+| followup | opus | session default (target: high, see below) |
+| spec-interview, spec-arch, spec-claudemd | opus | high |
+| spec-prd | sonnet | high |
+| gap-hunter (round 1) | sonnet | xhigh |
+| gap-rechecker (round 2 and 3) | sonnet | medium |
+| criteria-auditor, convention-checker | sonnet | medium |
+
+A skill's `effort:` is honored, and so is an agent's. Checked in a headless sandbox run (Claude Code 2.1.308, 2026-11-01) with throwaway skills: `effort: low`, `effort: high` and no field gave `low`, `high` and the session's `xhigh` on every main-thread call. The skill kept its model and attribution after each reviewer returned, and each of the four reviewers ran in the foreground at the effort in the table.
+
+build-phase and followup leave `effort:` unset on purpose. The target is `high`, but it is adopted only after an A/B run: build one plan step twice from the same commit in two git worktrees, with `effort: xhigh` in one copy of the skill and `effort: high` in the other, and compare each run's round-1 HIGH and MED findings (each checked by hand), the same per 100 changed production lines, cost and rounds, using `measure_sessions.py`. Adopt `high` only if it finds at most 2 more real HIGH and MED findings than `xhigh` and costs at least 20% less; otherwise keep `xhigh`. That A/B has not been completed, so until then both skills run at your session's effort.
+
+Measured cost before these settings: 15 build-phase runs averaged $21.7, from $11.7 to $39.4. About two thirds of it was re-reading context, not new output: thinking stays in context and is paid for again on every call, so effort drives both. The size of the change drives the rest: keep each run within the size gate.
+
+To measure your own runs: `python3 ~/.claude/shared/tools/measure_sessions.py --filter <repo-name>`. It prints cost, lines added, effort, model, calls that ran outside the skill, peak context, each reviewer's model, effort and foreground or background shape, the round records and the fix-plan check lines.
 
 ## Updating
 
@@ -150,7 +184,7 @@ Pull the repository and copy the folders again, as in Install. Re-copying resets
 - guardrails in the two standard folders are found again automatically;
 - if you chose a folder of your own, the next guarded skill asks again. Give it the same folder; the scripts are refreshed in place.
 
-Copying never deletes. Remove skills the repository no longer ships by hand: `rm -r ~/.claude/skills/{analyze-repo,validate-phase}`.
+Copying never deletes. Remove skills and agents the repository no longer ships by hand: `rm -r ~/.claude/skills/{analyze-repo,validate-phase}` and `rm ~/.claude/agents/{spec-validator,test-reporter}.md`.
 
 A `CLAUDE.md` written by an older spec-claudemd `@`-imports the PRD and ARCHITECTURE.md, and its invariants still sit in ARCHITECTURE.md. To move them, run `/spec-claudemd <plan.md>`, then `/spec-arch <plan.md>`.
 
@@ -159,8 +193,8 @@ A `CLAUDE.md` written by an older spec-claudemd `@`-imports the PRD and ARCHITEC
 ```bash
 cd ~/.claude
 rm -r skills/{build-phase,followup,spec-arch,spec-claudemd,spec-interview,spec-prd}
-rm agents/{convention-checker,criteria-auditor,gap-hunter,spec-validator,test-reporter}.md
-rm -r shared/guardrails shared/guardrails-setup.md shared/project-docs.md shared/question-round.md shared/scenario-checklist.md shared/validation-loop.md
+rm agents/{convention-checker,criteria-auditor,gap-hunter,gap-rechecker}.md
+rm -r shared/guardrails shared/tools shared/guardrails-setup.md shared/project-docs.md shared/question-round.md shared/scenario-checklist.md shared/validation-loop.md
 rm -r hooks/guardrails
 ```
 
@@ -171,7 +205,8 @@ rm -r hooks/guardrails
 | `PreToolUse:Bash hook error: guardrails: guard_bash.py not found in <folder>` on every call | the folder you chose for guardrails was moved or deleted | in a terminal: `python3 ~/.claude/shared/guardrails/configure.py --dir "<folder>"`, or `--off` |
 | a call denied with `[guardrail:<rule>]` | a guardrail did its job | run the command yourself if you really mean it |
 | "There's an issue with the selected model (claude-opus-…)" when a skill starts | your account or provider doesn't offer opus, and no fallback is set | add `"fallbackModel": ["sonnet"]` (Recommended settings) |
-| permission prompts, or your default model, after build-phase's reviewers report | fork mode is on, so the reviewers ran in the background | set `CLAUDE_CODE_FORK_SUBAGENT=0` (Recommended settings) |
+| permission prompts, or your default model, after build-phase's reviewers report | fork mode is on, so the reviewers ran in the background | set `CLAUDE_CODE_FORK_SUBAGENT=0` (Recommended settings); `measure_sessions.py` shows `background` per reviewer |
+| "This session started outside <repo>" | Claude Code was started in a parent folder | start it in the repository root, so its `CLAUDE.md`, settings and memory load |
 | a project's copy of a skill doesn't run | a personal skill of the same name in `~/.claude/skills` wins | delete one of them; for agents it's the reverse: the project copy wins |
 | "can't find scenario-checklist.md / validation-loop.md" | `shared/` isn't next to `skills/` | copy `shared/` as in Install |
 | a reviewer or helper agent can write files | an old agent file with `allowedTools:`, a field Claude Code silently ignores | re-copy `agents/`; the field is `tools:` |
@@ -183,13 +218,14 @@ To see the guardrails' decisions, read `guardrail-hooks.jsonl` in the `logs/` fo
 | Path | What it is |
 | --- | --- |
 | `skills/<name>/SKILL.md` | the six skills |
-| `agents/*.md` | the subagents; reviewers have no write tools and never change the repository. gap-hunter's probe scripts go in the scratchpad |
+| `agents/*.md` | the reviewers; none has write tools or changes the repository. gap-hunter's and gap-rechecker's probe scripts go in the scratchpad |
 | `shared/scenario-checklist.md` | test-scenario categories used by build-phase, followup, the reviewers and spec-interview |
 | `shared/validation-loop.md` | the can-fail pass and the review, fix and re-review procedure used by build-phase and followup |
 | `shared/project-docs.md` | which of the plan file, `PRD.md`, `ARCHITECTURE.md` and `CLAUDE.md` owns each kind of fact, used by the four spec skills |
 | `shared/question-round.md` | how every skill asks questions: the picker, the recommended-first order and the text fallback |
 | `shared/guardrails-setup.md` | the first-run guardrails questions |
 | `shared/guardrails/` | the hook scripts, `configure.py` (installs them and points the skills at them), and `settings.example.json` |
+| `shared/tools/measure_sessions.py` | measures runs from Claude Code's transcripts: cost, effort, skill escapes, context, reviewers, rounds |
 
 ## Contributing
 

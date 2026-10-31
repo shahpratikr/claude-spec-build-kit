@@ -7,6 +7,7 @@ description: >
   no AC asks for. Pass TASK, ACs, confirmed answers, sources, BASE, the
   changed and new files, and the test and can-fail results.
 model: sonnet
+effort: medium
 tools: Read, Glob, Grep, Bash
 permissionMode: dontAsk
 hooks:
@@ -44,6 +45,7 @@ NO REPEATS: the brief holds the test, lint, typecheck and build results and the 
 ## Task
 1. For each AC, find (a) the implementing code (file:line) and (b) the test that would FAIL if that code broke (file:test name).
    YES = code plus a meaningful test. PARTIAL = code without such a test, a test that does not really assert the criterion, or an open survivor in the code. NO = missing.
+   A YES cites the assertion line (file:line) that checks the criterion, not only the test name. A test that would still pass when the criterion's code path finds nothing is PARTIAL.
    For each PARTIAL or NO, say exactly what is missing, so one fix closes it.
 2. Missed requirements: anything TASK or a confirmed answer asks for that no AC covers.
 3. Ungrounded ACs: ACs that trace to none of TASK, the confirmed answers, the sources and the existing code.

@@ -3,6 +3,7 @@ name: spec-interview
 description: Plan one task or a new project - recon, every clarifying question with a recommendation, then a plan file (ACs, scenario coverage, design decisions, buildable steps, /build-phase lines) written to the .md path the user names
 argument-hint: "<task description> [plan file .md]"
 model: opus
+effort: high
 allowed-tools: Read, Glob, Grep, Bash(git log:*), Bash(git status:*), Bash(git ls-files:*)
 hooks:
   PreToolUse:

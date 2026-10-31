@@ -3,6 +3,7 @@ name: spec-claudemd
 description: Generate or refresh a lean CLAUDE.md from the code, the plan file, the PRD and ARCHITECTURE.md - enough to make a change on its own (commands, test rules, conventions, invariants, constraints), pointing to the docs instead of importing them
 argument-hint: "<plan file .md>"
 model: opus
+effort: high
 allowed-tools: Read, Glob, Grep, Write(./CLAUDE.md), Edit(./CLAUDE.md), Bash(git ls-files:*), Bash(git log:*)
 hooks:
   PreToolUse:
@@ -57,7 +58,6 @@ What the skills read from CLAUDE.md; each must be present, or stated as "none":
 | validation loop reviewers | the same commands; conventions, invariants and constraints, each with evidence, because a broken CLAUDE.md rule is BLOCKING |
 | followup | the build, test and generate commands; conventions; invariants; the docs map |
 | spec-interview | the test framework and command; invariants |
-| test-reporter agent | the `test (all):` line |
 
 ## Step 2 - Verify
 Run each command once (use --help or a dry run for anything slow or destructive, and say so). Record pass/fail. A command whose code does not exist yet is not run: it is written with "(planned)". If the baseline test suite fails, list the failing tests under "Known baseline failures". Do NOT fix them here.

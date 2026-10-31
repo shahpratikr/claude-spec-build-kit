@@ -7,6 +7,7 @@ description: >
   BASE when the changes are uncommitted. Returns violations list or
   "no violations".
 model: sonnet
+effort: medium
 tools: Read, Glob, Grep, Bash
 permissionMode: dontAsk
 hooks:

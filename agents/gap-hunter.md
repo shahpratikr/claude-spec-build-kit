@@ -7,6 +7,7 @@ description: >
   confirmed answers, sources, BASE, the changed and new files, the test
   and can-fail results), a scratchpad path and the checklist path.
 model: sonnet
+effort: xhigh
 tools: Read, Glob, Grep, Bash
 permissionMode: dontAsk
 hooks:
@@ -35,20 +36,20 @@ PROBES: probes are your strongest tool for defects. When reading cannot settle a
 - the brief: TASK, ACs, confirmed answers, BASE, sources (files the change must stay faithful to, or none), the changed production files, changed test files and new files, and the facts
 - scratchpad: where probe scripts go
 - checklist: path to the scenario checklist
-- re-check rounds only: the findings ledger with the calling skill's confirmations, PREV and a narrower scope. Follow that scope instead of reviewing everything again.
+
+You run in round 1 only. Re-check rounds use gap-rechecker.
 
 ## Task
 1. Read the checklist. Read the production diff (`git diff <BASE>`, plus new files), the callers of changed code and the sources FIRST.
 2. For each checklist category, list the scenarios that ought to be tested. Then read the tests and the open survivors, and mark each scenario covered or uncovered.
 3. Enumerate, do not sample. For every closed set the change defines or touches (states, statuses, exit or error codes, commands, options, roles, input kinds), build the table of each value against each event or path. Check that every cell is defined, reachable, handled one way only, and tested.
+   Do the same for every input surface the change accepts or emits: strings, paths, formats, markup, CLI arguments. List its syntactic variants from checklist category 2: quoting, whitespace, case, Unicode normalisation, encodings, line endings, path forms, empty, huge, nested or indented. Check each variant in the code and the tests. Probe the variants that reading cannot settle.
 4. Check every statement in the change (comments, docs, messages, the deliverable itself) against the code, against the sources, and against every other statement on the same subject. Report each misstatement or contradiction with both locations.
 5. Scan the production diff for defects: off-by-one, null handling, swallowed errors, missing await, races, resource leaks, unsafe SQL/HTML/paths, authorization gaps, secrets in logs.
 6. For each finding, search the change and its callers for the same pattern, and list every location in that one finding.
 7. For any category the author marked N/A, say whether the reason holds.
 
 ## Output (strictly this format — nothing else)
-Re-check rounds only, first: challenged confirmations, as ledger id | why its evidence does not hold | file:line, or "none"; then your items marked not confirmed, as ledger id | fixed / not fixed | file:line
-
 Every uncovered scenario and defect, no cap, HIGH first, then MED, then LOW. One line per root cause, with all its locations:
 category | scenario or defect | locations | concrete failure if untested | HIGH/MED/LOW | one-line suggested test
 
