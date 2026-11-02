@@ -2,7 +2,7 @@
 name: followup
 description: Follow-up on the current task - explore, decide, or implement. Lists every clarifying question, each with a recommendation, before acting
 argument-hint: "[explore: | decide: | implement:] <follow-up>"
-model: sonnet
+model: claude-sonnet-5-5
 effort: xhigh
 allowed-tools: Read, Grep, Glob, Edit, Write, Agent, Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git stash create:*), Bash(git rev-parse:*)
 hooks:

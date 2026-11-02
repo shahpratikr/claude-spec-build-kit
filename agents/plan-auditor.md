@@ -4,7 +4,7 @@ description: >
   Use this agent to review a finished plan file from plan-task
   before it is handed to build-task. Pass plan_file, the task text and
   the confirmed answers. Returns a findings list or "no plan findings".
-model: sonnet
+model: claude-sonnet-5-5
 effort: high
 tools: Read, Glob, Grep, Bash
 permissionMode: dontAsk

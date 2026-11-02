@@ -2,7 +2,7 @@
 name: build-task
 description: Implement one task in an existing codebase end to end - recon, brief, tests first, implement, then validate with independent reviewers, fix and re-validate until clean. Never commits.
 argument-hint: "<task description | Task Brief>"
-model: sonnet
+model: claude-sonnet-5-5
 effort: high
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
 hooks:

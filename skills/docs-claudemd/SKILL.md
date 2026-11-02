@@ -2,7 +2,7 @@
 name: docs-claudemd
 description: Generate or refresh a lean CLAUDE.md from the code, the plan file, the PRD and ARCHITECTURE.md - enough to make a change on its own (commands, test rules, conventions, invariants, constraints), pointing to the docs instead of importing them
 argument-hint: "<plan file .md>"
-model: sonnet
+model: claude-sonnet-5-5
 effort: high
 allowed-tools: Read, Glob, Grep, Write(./CLAUDE.md), Edit(./CLAUDE.md), Bash(git ls-files:*), Bash(git log:*)
 hooks:

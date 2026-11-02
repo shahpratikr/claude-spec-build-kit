@@ -2,7 +2,7 @@
 name: docs-arch
 description: Create or update docs/ARCHITECTURE.md from the code and the plan file - repository structure, components, data, flows, interfaces, configuration and decisions, with no product overview, invariants or plan material
 argument-hint: "<plan file .md> [what to cover]"
-model: sonnet
+model: claude-sonnet-5-5
 effort: high
 allowed-tools: Read, Glob, Grep, Write(./docs/ARCHITECTURE.md), Edit(./docs/ARCHITECTURE.md), Bash(git log:*), Bash(git ls-files:*), Bash(git status:*)
 hooks:

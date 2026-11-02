@@ -2,7 +2,7 @@
 name: plan-task
 description: Plan one task or a new project - recon, every clarifying question with a recommendation, then a plan file (ACs, scenario coverage, design decisions, buildable steps, /build-task lines) written to the .md path the user names
 argument-hint: "<task description> [plan file .md]"
-model: sonnet
+model: claude-sonnet-5-5
 effort: xhigh
 allowed-tools: Read, Glob, Grep, Agent, Bash(git log:*), Bash(git status:*), Bash(git ls-files:*)
 hooks:

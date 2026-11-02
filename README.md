@@ -150,15 +150,15 @@ Every skill and reviewer runs on Sonnet, the model Improving approves for this w
 
 | File | Model | Effort |
 | --- | --- | --- |
-| build-task | sonnet | high |
-| followup | sonnet | high |
-| plan-task, docs-arch, docs-claudemd | sonnet | high |
-| docs-prd | sonnet | high |
-| gap-hunter (round 1) | sonnet | xhigh |
-| fix-verifier (round 2 and 3) | sonnet | medium |
-| ac-auditor, convention-checker | sonnet | medium |
-| question-prober | sonnet | high |
-| plan-auditor | sonnet | high |
+| build-task | claude-sonnet-5-5 | high |
+| followup | claude-sonnet-5-5 | high |
+| plan-task, docs-arch, docs-claudemd | claude-sonnet-5-5 | high |
+| docs-prd | claude-sonnet-5-5 | high |
+| gap-hunter (round 1) | claude-sonnet-5-5 | xhigh |
+| fix-verifier (round 2 and 3) | claude-sonnet-5-5 | medium |
+| ac-auditor, convention-checker | claude-sonnet-5-5 | medium |
+| question-prober | claude-sonnet-5-5 | high |
+| plan-auditor | claude-sonnet-5-5 | high |
 
 A skill's `effort:` is honored, and so is an agent's. Checked in a headless sandbox run (Claude Code 2.1.308, 2026-11-01) with throwaway skills: `effort: low`, `effort: high` and no field gave `low`, `high` and the session's `xhigh` on every main-thread call. The skill kept its model and attribution after each reviewer returned, and each of the four reviewers ran in the foreground at the effort in the table.
 
