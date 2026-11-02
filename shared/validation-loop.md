@@ -15,8 +15,8 @@ SHORT OUTPUT: everything a command prints stays in context for the rest of the r
 ## Inputs (from the calling skill)
 - TASK: the user's request, verbatim.
 - ACs: the acceptance criteria, verbatim.
-- Confirmed answers: the user's answers from earlier question rounds (Q -> answer), or none. They are intent: without them, reviewers report the ACs those answers produced as ungrounded.
-- Sources: files the change must stay faithful to, such as specs, source documents and files the task names, or none.
+- Confirmed answers: the user's answers from earlier question rounds and the plan's Confirmed answers (Q -> answer), or none. They are intent: without them, reviewers report the ACs those answers produced as ungrounded.
+- Sources: the plan file when one was named, and files the change must stay faithful to, such as specs, source documents and files the task names, or none.
 - BASE: the snapshot taken before the first edit. `git stash create` prints a hash that records the tracked files without touching the working tree or index; when it prints nothing, BASE is `git rev-parse HEAD`. `git diff <BASE>` then shows exactly this change, even when the tree already held other uncommitted work.
 - Files: changed production files, changed test files, and new untracked files (compare `git status --porcelain --untracked-files=all` with the list recorded at the snapshot).
 - Commands: test, lint, typecheck and build, plus the baseline failing tests.
@@ -25,7 +25,7 @@ SHORT OUTPUT: everything a command prints stays in context for the rest of the r
 
 ## Size tier
 Set once, before round 1, from `git diff <BASE> --stat` plus the line counts of new files, production and test files together:
-- S: at most 3 files and 80 changed lines. Round 1 spawns gap-hunter alone. The calling skill maps each AC to its code and its assertion line (file:line) itself, and puts that map into the facts.
+- S: at most 3 files and 80 changed lines. Round 1 spawns gap-hunter alone. The calling skill maps each AC to its code and its assertion line (file:line) itself, and puts that map into the facts. A deep profile (see the task profile) also spawns criteria-auditor at this tier.
 - M: anything larger, up to the size gate. Round 1 spawns all three reviewers.
 - L: over the size gate, built in one run at the user's choice. All three reviewers, and the record says so.
 
@@ -36,6 +36,7 @@ Proves that the tests catch a break in the changed code. The calling skill runs 
 3. Break the code in place, one break at a time. Save each file to the scratchpad first and restore it in a `finally` block. Afterwards confirm that `git status --porcelain` and `git diff <BASE> --stat` match what they were before the pass.
 4. The script writes every result to `canfail-r<n>.txt` in the scratchpad and prints only the killed and survived counts, plus file:line and the break for each survivor. Run it in the foreground (ONE TURN).
 5. Kill each survivor with a test, or record why it cannot change behavior. The survivors left open, each with that reason, go into the facts.
+When the project has no tests, the pass is N/A with that reason: a validation command whose exit code fails when the AC is violated counts as the test, and an AC with neither stays PARTIAL, so the verdict is NEEDS REVIEW.
 Do not run it again in the same round, or after the last round unless code changed since.
 
 ## Fix plan (every fix round, before any edit)

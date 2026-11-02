@@ -5,6 +5,7 @@ Every question a skill puts to the user goes through this file, wherever a skill
 ## Before asking
 Give every question these parts:
 - Q<n>, numbered on from the last question in this session, BLOCKING or NON-BLOCKING, and a category from the skill's checklist.
+- BLOCKING means a wrong default would change an AC, a public contract, stored data or security behavior, or cannot be undone. Everything else is NON-BLOCKING.
 - The question, and why it matters: how the answer changes the result.
 - 2-4 options. Your recommendation comes first, with its reason and a confidence tag: [Certain], [Likely] or [Guessing].
 - A default for when it stays unanswered: stop for BLOCKING, the recommended option for NON-BLOCKING unless you say otherwise.
@@ -17,7 +18,8 @@ Shape each question to fit the picker:
 - Open input with no likely values (the task itself, a description to paste): skip the picker. Ask in one plain line and stop; the user's next message is the answer.
 
 Before a round of two or more questions, print as text:
-- "Resolved from code (challenge me if wrong)": item -> file:line
+- "Resolved from code (challenge me if wrong)": item -> file:line and the quoted line
+- "Dropped questions" and the "Assumption register", when the skill keeps them (spec-interview): each dropped question with its one-line reason, each assumption verified from code or asked
 - "Recommended path": 2-4 lines on what happens if the user accepts every recommendation
 - one count line, for example "11 questions: 5 blocking, 6 non-blocking, in 3 dialogs"
 

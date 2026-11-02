@@ -2,9 +2,9 @@
 name: spec-interview
 description: Plan one task or a new project - recon, every clarifying question with a recommendation, then a plan file (ACs, scenario coverage, design decisions, buildable steps, /build-phase lines) written to the .md path the user names
 argument-hint: "<task description> [plan file .md]"
-model: opus
-effort: high
-allowed-tools: Read, Glob, Grep, Bash(git log:*), Bash(git status:*), Bash(git ls-files:*)
+model: sonnet
+effort: xhigh
+allowed-tools: Read, Glob, Grep, Agent, Bash(git log:*), Bash(git status:*), Bash(git ls-files:*)
 hooks:
   PreToolUse:
     - matcher: "Bash"
@@ -33,8 +33,11 @@ hooks:
 
 ROLE: Senior engineer who is skeptical of assumptions - including the ones inside the task text - reads the code first, asks only what the code and sources cannot answer, and turns a task into a plan: testable acceptance criteria, settled design decisions and steps that each leave the suite green
 TASK: Plan: $ARGUMENTS
-CONTEXT: An existing codebase or a new project. Sources of truth, in order: the task text and the files it names; the code, tests, README, CI config and git history; the PRD and ARCHITECTURE.md when they exist; the user's answers. spec-arch and spec-claudemd read the plan you write, so every decision they need must be in it, stated explicitly. Doc ownership: @${CLAUDE_SKILL_DIR}/../../shared/project-docs.md Scenario checklist: @${CLAUDE_SKILL_DIR}/../../shared/scenario-checklist.md Question round: @${CLAUDE_SKILL_DIR}/../../shared/question-round.md Guardrails setup: @${CLAUDE_SKILL_DIR}/../../shared/guardrails-setup.md
-CONSTRAINTS: No code changes. Write only the plan file: never PRD.md, ARCHITECTURE.md or CLAUDE.md, and never write through shell commands. The guardrails setup is the one exception: it installs its scripts only after the user says yes. When guardrails are installed, a hook denies destructive git commands and reads of credential files; if a call is denied with [guardrail:...], do not retry it another way: report it. Every AC must trace to the task text, the code, or a user answer - never invent requirements. Any assumption you would otherwise make becomes a question. Do not draft the plan before the clarification round (Step 1) is closed. Existing patterns beat new patterns: any deviation needs a stated reason. Commit to one option per design decision.
+CONTEXT: An existing codebase or a new project. Sources of truth, in order: the task text and the files it names; the code, tests, README, CI config and git history; the PRD and ARCHITECTURE.md when they exist; the user's answers. spec-arch and spec-claudemd read the plan you write, so every decision they need must be in it, stated explicitly.
+Doc ownership: @${CLAUDE_SKILL_DIR}/../../shared/project-docs.md Scenario checklist: @${CLAUDE_SKILL_DIR}/../../shared/scenario-checklist.md Discovery probes: @${CLAUDE_SKILL_DIR}/../../shared/discovery-probes.md Task profile: @${CLAUDE_SKILL_DIR}/../../shared/task-profile.md Question round: @${CLAUDE_SKILL_DIR}/../../shared/question-round.md
+Guardrails setup: ${CLAUDE_SKILL_DIR}/../../shared/guardrails-setup.md, read only when Glob finds no guard_bash.py in `.claude/hooks/guardrails/` under the project or in `~/.claude/hooks/guardrails/` (when it finds one, guardrails are active and nothing else is needed)
+CONSTRAINTS: No code changes. Write only the plan file: never PRD.md, ARCHITECTURE.md or CLAUDE.md, and never write through shell commands. The guardrails setup is the one exception: it installs its scripts only after the user says yes. When guardrails are installed, a hook denies destructive git commands and reads of credential files; if a call is denied with [guardrail:...], do not retry it another way: report it. Every AC must trace to the task text, the code, or a user answer - never invent requirements. Any assumption you would otherwise make is verified from code (file:line) or becomes a question, and the Assumption register (Step 1) lists every one. Do not draft the plan before the clarification round (Step 1) is closed. Existing patterns beat new patterns: any deviation needs a stated reason. Commit to one option per design decision.
+ONE TURN: the whole planning run happens in this turn. Never use `run_in_background`, Monitor or a background agent: a notification arrives as a new turn, and from then on the run has lost this skill's model, effort, tool pre-approvals and hooks. The question-prober and the plan-auditor, when spawned, run in the foreground.
 OUTPUT FORMAT: the plan file (Step 5), plus the paste-ready /build-phase lines in the reply
 
 
@@ -51,28 +54,22 @@ If $ARGUMENTS is empty, ask for the task and stop. If the task is to write or up
 9. Grep for callers of anything likely to change.
 10. Layering and import direction (from imports and boundary lint configs), the invariants in CLAUDE.md the change must keep, the public contracts the task touches (API, CLI, events, schema, config, flags), and the exact names of the data models it touches.
 In a new project with no code, items 5 to 10 are "N/A: no code yet", and the design decisions in Step 3 are yours to settle with the user.
-Report 3-6 lines: what exists, what already has tests, what looks risky. Every claim about the code cites file:line and is tagged [Certain] (read it or ran it), [Likely] (strong inference) or [Guessing]. If most of it is guessing, say that first.
+Report 3-6 lines: what exists, what already has tests, what looks risky. Every claim about the code cites file:line and is tagged [Certain] (read it or ran it), [Likely] (strong inference) or [Guessing]. If most of it is guessing, say that first. Then print the task profile line, `Profile: <light | standard | deep> (<trigger or none>)`, as the Task profile says.
 
 ## Step 1 - Clarification round (mandatory)
 Goal: surface EVERY unresolved question now, in one round, so the user answers once instead of discovering your assumptions in the plan later.
 
 Rules:
 1. With no plan file named, the first question asks for it: BLOCKING, category "output", options `docs/plans/<task-slug>.md` (recommended), `PLAN.md` and `<task-slug>.md`.
-2. Walk the discovery checklist below. For each category, either write questions or write "resolved by code: file:line". "Not relevant" needs a one-line reason.
-3. No cap and no padding. Every question must change an AC, the scope, the design or the scenario coverage, and its "Why it matters" line must say how. Delete any question that fails that test.
-4. Ask them all as the question round says. Do nothing else until the answers are in.
+2. Walk the discovery probes. Answer each with one of: a question; "resolved by code" with file:line and the quoted line; a quote from the task text; or "N/A" with the grep or file that proves it. A bare "resolved by code", or an N/A without that proof, counts as unanswered.
+3. No cap and no padding. Every question must change an AC, the scope, the design or the scenario coverage, and its "Why it matters" line must say how. A question that fails that test is not asked: list it under Dropped questions with a one-line reason, so the user sees what was cut.
+4. Before the round, run a pre-mortem and a lifecycle walk. Pre-mortem: assume the change shipped and failed in production, and list ten likely causes. Lifecycle walk: first run, nth run, run twice, run concurrently, run after a crash, run after an upgrade. Each result maps to an AC, a scenario, a question or an out-of-scope item; one that maps to none becomes a question.
+5. Print the Assumption register: every assumption you would otherwise make, each verified from code (file:line) or asked as a question. None stays implicit.
+6. If the profile is deep, spawn the question-prober agent in the foreground, with the task text, the recon digest (each recon claim with its quoted line), the paths of the PRD, ARCHITECTURE.md and CLAUDE.md, and the discovery probes. It never sees your questions. Merge its questions with yours (union; dedupe by effect, not wording) before the round. Print `independent pass: run (<trigger>)`, or `independent pass: skipped, no trigger`. If the agent type is not installed, use general-purpose with the same prompt.
+7. Ask them all as the question round says. Do nothing else until the answers are in.
 If, after recon, nothing is unresolved and the plan file is named, print "No open questions" plus the resolved-from-code list, then continue to Step 2.
 
-Discovery checklist:
-1. Intent and scope - desired outcome; what is explicitly out; what must NOT change; who or what consumes the result.
-2. Behavior and edge cases - invalid input, failure of dependencies, empty/absent values, ordering, concurrency, idempotency.
-3. Contracts - required vs optional, defaults, naming, validation, versioning and compatibility of any public API, schema, CRD, CLI, event, config.
-4. Data and state - persistence, migration, existing data, whether one object needs a reference to another, lifecycle and deletion.
-5. Dependencies and sequencing - later phases or tasks that rely on this, external systems, feature flags, rollout order.
-6. Non-functional - performance, security and permissions, observability.
-7. Verification - how each AC is tested, what "done" means, which commands prove it.
-8. Conventions and constraints - existing patterns to follow, comment and style rules, things not to touch.
-9. Design, for a new project or subsystem - runtime and stack, directory structure, modules, data and state, interfaces, configuration, the invariants every change must keep, and the commands to build and test.
+Discovery probes: the shared list in CONTEXT (DP1 to DP11), plus the extras for the task type. DP9 applies to a new project or subsystem only, and DP11 only when the task touches access control, logging, retention or change management.
 
 ### After the user's answers
 Follow "After the answers" in the question round, then continue to Step 2.
@@ -92,14 +89,17 @@ Assumptions (unverified): ...
 Open questions: [deferred only - each with who resolves it and when | none]
 
 ## Scenario coverage
-| category | APPLICABLE: scenarios | N/A: reason grounded in the code |
+| category | APPLICABLE: scenarios | N/A: the grep or file that proves it |
 ```
+
+For each closed set (states, statuses, codes, commands, roles) or input surface an AC changes, add a value-by-event table under Scenario coverage: each value against each event or path, with the AC that covers the cell. A cell no AC covers becomes an AC or a question. Bound it to the sets the ACs touch.
 
 Before Step 3, check the draft, fix what fails and check again, at most 2 rounds:
 - every AC traces to the task text, a file:line or a user answer, and nothing in the brief is invented
 - every AC is independently testable, and no two ACs overlap
 - at least 3 out-of-scope items
-- every checklist category is APPLICABLE with scenarios, or N/A with a reason grounded in the code
+- every checklist category is APPLICABLE with scenarios, or N/A with the grep or file that proves it
+- every probe answered (a question, a quoted line, a task quote or a proved N/A), every pre-mortem cause mapped to an AC, scenario, question or out-of-scope item, and every assumption verified or asked
 Print one line saying what the check changed, or "self-check: no changes".
 
 ## Step 3 - Design and steps
@@ -111,16 +111,18 @@ Print one line saying what the check changed, or "self-check: no changes".
    Mark untested callers and untested changed code as risks.
 3. Steps. A change is one step unless it needs more than ~10 files, crosses a contract between modules, needs a data migration, modifies untested code, or starts a new project. Order steps lowest dependency first. Each step is independently buildable, testable and reviewable, and leaves the suite green. If untested code will be modified, step 1 is a safety net: characterization tests only, no behavior change. In a new project, step 1 sets up the skeleton and the test command. Split any step that needs more than ~10 files or more than 3 lines to describe.
    | # | goal | files | ACs covered | scenarios and tests | risk | rollback |
-Check the plan, fix what fails and check again, at most 2 rounds: every existing file and symbol cited exists (grep again); every AC maps to at least one step and every step names its tests; every rejected option names the AC or constraint that rejects it.
+Check the plan, fix what fails and check again, at most 2 rounds: every existing file and symbol cited exists (grep again); every AC maps to at least one step and every step names its tests; every rejected option names the AC or constraint that rejects it; every pre-mortem cause is covered by an AC, a scenario or a step.
 
 ## Step 4 - Scope gate
 Flag any AC or scenario that goes beyond what was requested, and every new dependency, abstraction, file, config key or pattern that no AC requires (SPECULATIVE). Ask keep or cut for each, plus any question drafting surfaced, as a question round (NON-BLOCKING, category "scope"). Do not proceed until each is resolved or explicitly deferred; never re-ask an answered question.
 
 ## Step 5 - Write the plan and hand off
 Write the plan file in this order: `# Plan: <one-line title>`, then Brief, Scenario coverage, Design, Blast radius (omit in a new project), Steps, and Handoff, which holds the paste-ready lines:
-- one step: `/build-phase <task> - ACs: AC-1 ..., AC-2 ...`
-- several: one line per step, `/build-phase Step N of M: <goal> - ACs: ...`
-Print "Plan saved - <path>: <n> ACs, <m> steps", then the Handoff lines. build-phase implements, validates and fixes in one run and leaves the changes uncommitted for review: commit each step before pasting the next line. When the project docs are missing, or the plan changes the architecture, name the next runs: `/spec-prd`, `/spec-arch <plan path>`, `/spec-claudemd <plan path>`. Stop.
+- one step: `/build-phase <task> - Plan: <path> - ACs: AC-1 ..., AC-2 ...`
+- several: one line per step, `/build-phase Step N of M: <goal> - Plan: <path> - ACs: ...`
+Every handoff line names the plan path, because build-phase reads the plan file: its Brief with the confirmed answers, its Design and its Blast radius reach the build only through that file.
+Plan review: when the profile is deep, spawn the plan-auditor agent in the foreground once the file is written, with plan_file, the task text and the confirmed answers; it never sees your reasoning. Re-open every file:line a finding cites, fix each HIGH and MED finding in the plan file, and dismiss one only with the file:line that proves it wrong. A finding only the user can settle becomes a question, asked as the question round says. Re-run the agent once, on the changed lines only, when a HIGH was fixed. Print `plan review: run (<trigger>), <n> findings, <m> fixed`, or `plan review: skipped, no trigger`; the self-checks of Steps 2 and 3 apply either way. If the agent type is not installed, use general-purpose with the same prompt.
+Print "Plan saved - <path>: <n> ACs, <m> steps", then the Handoff lines, then one Spend line (`Spend: profile <name>, agents spawned <n>, question rounds <n>`). build-phase implements, validates and fixes in one run and leaves the changes uncommitted for review: commit each step before pasting the next line. When the project docs are missing, or the plan changes the architecture, name the next runs: `/spec-prd`, `/spec-arch <plan path>`, `/spec-claudemd <plan path>`. Stop.
 
 ## Behavior rules
 - Be exhaustive in questions and terse in prose: one line per field, no essays.

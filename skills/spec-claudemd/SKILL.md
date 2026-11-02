@@ -2,7 +2,7 @@
 name: spec-claudemd
 description: Generate or refresh a lean CLAUDE.md from the code, the plan file, the PRD and ARCHITECTURE.md - enough to make a change on its own (commands, test rules, conventions, invariants, constraints), pointing to the docs instead of importing them
 argument-hint: "<plan file .md>"
-model: opus
+model: sonnet
 effort: high
 allowed-tools: Read, Glob, Grep, Write(./CLAUDE.md), Edit(./CLAUDE.md), Bash(git ls-files:*), Bash(git log:*)
 hooks:
@@ -33,8 +33,28 @@ hooks:
 
 ROLE: Technical writer producing an actionable developer reference that is loaded into every future Claude session
 TASK: Create or update CLAUDE.md from what the repository contains and the plan decides: $ARGUMENTS
-CONTEXT: CLAUDE.md must be dense and actionable, not a summary. It loads into every session, and every skill reads it to find commands and rules instead of guessing (table in Step 1), so a missing or vague line costs every later run. It must be enough to make a change on its own: commands, test rules, conventions, the invariants every change must keep, and hard constraints. It imports nothing. An `@` import would load the whole PRD and ARCHITECTURE.md into every session, and no skill needs them on every call. Instead, it names them by plain path and says which section to read for what. Evidence priority: existing CLAUDE.md (hand-written lines) > CI config (what really runs) > package manifests / Makefile / scripts > lint, format and type configs > tests and validation code that enforce a rule > sampled code > the plan's Design section (for what is not built yet) > invariants and layering rules an existing ARCHITECTURE.md still holds > README. Doc ownership: @${CLAUDE_SKILL_DIR}/../../shared/project-docs.md Question round: @${CLAUDE_SKILL_DIR}/../../shared/question-round.md Before Step 0, run the guardrails setup: @${CLAUDE_SKILL_DIR}/../../shared/guardrails-setup.md
-CONSTRAINTS: Include only commands, conventions Claude would otherwise get wrong, invariants and hard constraints. Every convention needs evidence: at least 2 code examples (file:line), one enforcing config rule, or, before the code exists, a decision in the plan. Every invariant names what enforces it (a test, a lint rule, validation code) or says "not enforced". No evidence means omit it or ask the user. Every command must be verified, or marked planned when the code it needs does not exist yet. No feature descriptions, rationale, or aspirations. Never restate what the PRD or ARCHITECTURE.md hold (product facts, structure, components, flows, interfaces, configuration, decisions): name the section instead. No `@` imports (project-docs rule 9). Take decisions from the plan, never its task material, and never name the plan (project-docs rule 4). Target under 150 lines. Write only CLAUDE.md, and never a real credential into it. If a call is denied with [guardrail:...], do not retry it another way: list it with the commands you could not verify.
+CONTEXT: CLAUDE.md must be dense and actionable, not a summary.
+It loads into every session, and every skill reads it to find commands and rules instead of guessing (table in Step 1), so a missing or vague line costs every later run.
+It must be enough to make a change on its own: commands, test rules, conventions, the invariants every change must keep, and hard constraints.
+It imports nothing.
+An `@` import would load the whole PRD and ARCHITECTURE.md into every session, and no skill needs them on every call.
+Instead, it names them by plain path and says which section to read for what.
+Evidence priority: existing CLAUDE.md (hand-written lines) > CI config (what really runs) > package manifests / Makefile / scripts > lint, format and type configs > tests and validation code that enforce a rule > sampled code > the plan's Design section (for what is not built yet) > invariants and layering rules an existing ARCHITECTURE.md still holds > README.
+Doc ownership: @${CLAUDE_SKILL_DIR}/../../shared/project-docs.md
+Question round: @${CLAUDE_SKILL_DIR}/../../shared/question-round.md
+Before Step 0, run the guardrails setup: ${CLAUDE_SKILL_DIR}/../../shared/guardrails-setup.md, read only when Glob finds no guard_bash.py in `.claude/hooks/guardrails/` under the project or in `~/.claude/hooks/guardrails/` (when it finds one, guardrails are active and nothing else is needed)
+CONSTRAINTS: Include only commands, conventions Claude would otherwise get wrong, invariants and hard constraints.
+Every convention needs evidence: at least 2 code examples (file:line), one enforcing config rule, or, before the code exists, a decision in the plan.
+Every invariant names what enforces it (a test, a lint rule, validation code) or says "not enforced".
+No evidence means omit it or ask the user.
+Every command must be verified, or marked planned when the code it needs does not exist yet.
+No feature descriptions, rationale, or aspirations.
+Never restate what the PRD or ARCHITECTURE.md hold (product facts, structure, components, flows, interfaces, configuration, decisions): name the section instead.
+No `@` imports (project-docs rule 9).
+Take decisions from the plan, never its task material, and never name the plan (project-docs rule 4).
+Target under 150 lines.
+Write only CLAUDE.md, and never a real credential into it.
+If a call is denied with [guardrail:...], do not retry it another way: list it with the commands you could not verify.
 
 ## Step 0 - Detect current state
 - Plan file: the .md path in $ARGUMENTS. With none, glob for likely plans (`docs/plans/*.md`, `PLAN.md`, `*plan*.md`) and ask for it as a BLOCKING question (category "input"), offering what you found plus "No plan file". Wait for the answer.

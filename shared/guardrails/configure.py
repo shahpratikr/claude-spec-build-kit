@@ -46,10 +46,16 @@ def install(dest: Path) -> None:
     dest.mkdir(parents=True, exist_ok=True)
     for name in SCRIPTS:
         shutil.copy2(HERE / name, dest / name)
-    check = subprocess.run([sys.executable, str(dest / "guard_bash.py"), "--dry-run", "git push --force origin main"],
-                           capture_output=True, text=True, timeout=30)
-    if not check.stdout.startswith("deny"):
-        raise SystemExit(f"check failed in {dest}: {check.stdout or check.stderr}")
+    selftest = HERE / "selftest.py"
+    if selftest.exists():
+        check = subprocess.run([sys.executable, "-B", str(selftest), "--dir", str(dest)], capture_output=True, text=True, timeout=120)
+        if check.returncode != 0:
+            raise SystemExit(f"self-test failed in {dest}:\n{check.stdout}{check.stderr}")
+    else:
+        check = subprocess.run([sys.executable, str(dest / "guard_bash.py"), "--dry-run", "git push --force origin main"],
+                               capture_output=True, text=True, timeout=30)
+        if not check.stdout.startswith("deny"):
+            raise SystemExit(f"check failed in {dest}: {check.stdout or check.stderr}")
 
 
 def main() -> int:

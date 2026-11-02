@@ -43,7 +43,7 @@ NO REPEATS: the brief holds the test, lint, typecheck and build results and the 
 - re-check rounds only: the findings ledger with the calling skill's confirmations, PREV and a narrower scope. Follow that scope instead of auditing everything again.
 
 ## Task
-1. For each AC, find (a) the implementing code (file:line) and (b) the test that would FAIL if that code broke (file:test name).
+1. For each AC, find (a) the implementing code (file:line) and (b) the test that would FAIL if that code broke (file:test name). A validation command named in the brief counts as the test when its exit code fails if the criterion is violated.
    YES = code plus a meaningful test. PARTIAL = code without such a test, a test that does not really assert the criterion, or an open survivor in the code. NO = missing.
    A YES cites the assertion line (file:line) that checks the criterion, not only the test name. A test that would still pass when the criterion's code path finds nothing is PARTIAL.
    For each PARTIAL or NO, say exactly what is missing, so one fix closes it.

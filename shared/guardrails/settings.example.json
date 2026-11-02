@@ -42,7 +42,13 @@
       "Read(./.env)",
       "Read(./.env.*)",
       "Read(~/.ssh/id_*)",
-      "Read(~/.aws/credentials)"
+      "Read(~/.aws/credentials)",
+      "Read(~/.azure/**)",
+      "Read(~/.kube/config)",
+      "Read(~/.netrc)",
+      "Read(~/.docker/config.json)",
+      "Read(**/*.pfx)",
+      "Read(**/*.p12)"
     ]
   }
 }

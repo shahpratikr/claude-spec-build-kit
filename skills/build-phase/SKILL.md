@@ -2,7 +2,8 @@
 name: build-phase
 description: Implement one task in an existing codebase end to end - recon, brief, tests first, implement, then validate with independent reviewers, fix and re-validate until clean. Never commits.
 argument-hint: "<task description | Task Brief>"
-model: opus
+model: sonnet
+effort: high
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
 hooks:
   PreToolUse:
@@ -32,7 +33,7 @@ hooks:
 
 ROLE: Senior engineer making one change in an existing codebase, with tests that would catch a regression. The change is done when independent reviewers find nothing left to fix, not when it compiles
 TASK: Implement: $ARGUMENTS
-CONTEXT: No PRD or architecture doc is assumed. "Done" is defined by the task text, the existing code and tests, and the Task Brief you derive. Scenario checklist: @${CLAUDE_SKILL_DIR}/../../shared/scenario-checklist.md Validation loop: @${CLAUDE_SKILL_DIR}/../../shared/validation-loop.md Question round: @${CLAUDE_SKILL_DIR}/../../shared/question-round.md Guardrails setup: @${CLAUDE_SKILL_DIR}/../../shared/guardrails-setup.md
+CONTEXT: No PRD or architecture doc is assumed. "Done" is defined by the task text, the existing code and tests, and the Task Brief you derive. Scenario checklist: @${CLAUDE_SKILL_DIR}/../../shared/scenario-checklist.md Validation loop: @${CLAUDE_SKILL_DIR}/../../shared/validation-loop.md Question round: @${CLAUDE_SKILL_DIR}/../../shared/question-round.md Task profile: @${CLAUDE_SKILL_DIR}/../../shared/task-profile.md Guardrails setup: ${CLAUDE_SKILL_DIR}/../../shared/guardrails-setup.md, read only when Glob finds no guard_bash.py in `.claude/hooks/guardrails/` under the project or in `~/.claude/hooks/guardrails/` (when it finds one, guardrails are active and nothing else is needed)
 CONSTRAINTS: This task only. No drive-by refactors or reformatting. No new dependencies unless the task cannot be done without one and the user approves it. No destructive git commands (reset --hard, checkout --, restore, clean, stash drop, force push). Never stage, commit, push or switch branches: every change stays uncommitted in the working tree for the user to review. Files that were already modified or untracked before you started are off-limits unless the task requires them; say so when it does.
 QUESTIONS: Ask only BLOCKING questions: ones the task, code and tests cannot answer, where a wrong guess would change an AC or a public contract. Ask them as the question round says, so the build continues in this turn. Every other open point becomes an assumption with your recommended default, listed in the report.
 GUARDRAILS: When guardrails are installed, hooks deny destructive git commands, force pushes and credentials in written files, and commits and new dependencies wait for a human click. The rules above apply either way. If a call is denied with [guardrail:...], do not retry it another way: record it in the report.
@@ -48,9 +49,10 @@ Live state (verify these render; if they appear as literal text, run the git com
 - If $ARGUMENTS is empty, ask for the task and stop.
 - If the live state says "not a git repository" and the task names a repository (a path, or a plan whose files sit in one), warn in one line: "This session started outside <repo>, so Claude Code did not load its CLAUDE.md, settings or memory, and hooks see <cwd> as the project. Start Claude Code in the repository root next time." Then read `<repo>/CLAUDE.md` yourself, run every git command as `git -C <repo> ...` and continue. With no repository named, ask for it as a BLOCKING question.
 - If the task is to write or update the PRD, ARCHITECTURE.md or CLAUDE.md, name the skill that owns that file (/spec-prd, /spec-arch, /spec-claudemd) and stop.
+- If $ARGUMENTS names a plan file (a `/spec-interview` handoff carries `Plan: <path>`), read the plan file: its Brief with the confirmed answers, its Design, its Blast radius and the row of the named step. Those decisions bind the build.
 - Run the guardrails setup before anything else.
 - Snapshot the starting state so the change can be validated without a commit. Run `git stash create`: it prints a hash that records the tracked files as they are now, without touching the working tree or index. BASE is that hash, or the output of `git rev-parse HEAD` when it prints nothing. Record BASE and the output of `git status --porcelain --untracked-files=all`.
-- Find commands: CLAUDE.md (Commands + Testing) first, then package scripts / Makefile / CI config. An unknown test command is a BLOCKING question. Never substitute a guess.
+- Find commands: CLAUDE.md (Commands + Testing) first, then package scripts / Makefile / CI config. An unknown test command is a BLOCKING question. Never substitute a guess. When CLAUDE.md and CI name no test command, read ${CLAUDE_SKILL_DIR}/../../shared/verification-profiles.md and ask the question with a recommended option from its table.
 
 ## Step 1 - Recon (read-only)
 1. Locate the code involved. Read the relevant functions of at least 2 sibling implementations and of their tests, not whole files (CONTEXT).
@@ -64,8 +66,8 @@ Run the full test command (plus lint/typecheck if they exist) BEFORE editing. Re
 
 ## Step 3 - Task Brief + Test Plan (no approval gate)
 Write these in your reply before creating any file, so the user can follow the build:
-1. Task Brief: goal, in/out of scope (at least 3 out), ACs (AC-1..n, "The system shall ..."), assumptions with the default you chose, blocking questions. If $ARGUMENTS already contains ACs from /spec-interview, reuse them verbatim.
-2. Test Plan: apply the checklist. One row per category: APPLICABLE (scenarios -> test name -> level -> file) or N/A (reason grounded in the code).
+1. Task Brief: goal, in/out of scope (at least 3 out), ACs (AC-1..n, "The system shall ..."), assumptions with the default you chose, blocking questions. If $ARGUMENTS already contains ACs from /spec-interview, reuse them verbatim. When a plan was read, reuse the plan's confirmed answers and scenario coverage, and derive only what the plan lacks.
+2. Test Plan: apply the checklist. One row per category: APPLICABLE (scenarios -> test name -> level -> file) or N/A (the grep or file that proves it).
 3. File tree: files to create/modify, each marked new/modified and "mirrors <existing file>".
 4. Anything beyond the ACs is SPECULATIVE: do not build it; list it in the report.
 5. Variant table and pre-mortem, before any test:
@@ -73,6 +75,7 @@ Write these in your reply before creating any file, so the user can follow the b
    - Per AC, the two most likely ways the implementation could be wrong, each mapped to a test.
    The table is your reasoning: it feeds the test plan and the validation loop's fix plans, and never goes to a reviewer.
 6. Size gate. Every review round re-reads the whole change, so one run builds at most about 10 production files. When the file tree has more, or the repository has no code yet and the task is more than its skeleton, ask one BLOCKING question (category "scope"), even though it is not about intent. The options are "Split it with /spec-interview (Recommended)", described with the file count, and "Build it all in one run", described as taking hours of review. On split, print the count and a ready line, `/spec-interview <task> docs/plans/<task-slug>.md`, and stop. A "Step N of M" task from a plan is gated the same way.
+7. Profile: print `Profile: <light | standard | deep> (<trigger or none>)` as the Task profile says, and pass it to the validation loop (a deep profile adds criteria-auditor at size tier S).
 Ask any BLOCKING question now (see QUESTIONS), then continue. Do not wait for approval.
 
 ## Step 4 - Tests first
@@ -113,12 +116,12 @@ Fix problems before testing.
 a. New tests pass.
 b. Full suite + lint + typecheck (+ build if it exists). Compare with the Step 2 baseline: no NEW failures. Pre-existing failures are reported, not fixed.
 c. If new tests involve time, async, concurrency or randomness, run them 3 times.
-d. Can-fail pass: run it on every changed production line, as the validation loop defines it, once. Kill each survivor with a test, or record why it cannot change behavior.
+d. Can-fail pass: run it on every changed production line, as the validation loop defines it, once. Kill each survivor with a test, or record why it cannot change behavior. A task with no unit tests (infrastructure, scripts, configuration, docs) is not executable-verified: the can-fail pass is N/A with that reason, and each AC is verified by the output of a validation command that exits non-zero when the AC is violated (the rules in verification-profiles.md).
 e. If coverage tooling exists, check changed lines. Test each uncovered line or justify it.
 f. Failures caused by this change: fix now. Do not proceed with new failures.
 
 ## Step 8 - Validate, fix, re-validate
-Run the validation loop with TASK = $ARGUMENTS verbatim, the brief's ACs, the confirmed answers (the brief's plus this run's), the sources (spec or source files the task or brief names), BASE, the file lists, the commands, the Step 2 baseline and the Step 7 results as the facts, and the Step 3 variant table. Round 1 reuses the facts, the can-fail pass included. The loop sets the size tier. Before each fix round, write and check the loop's fix plan; no edit starts before its check line. Then fix every MUST-FIX finding by following Steps 4-6, and re-check as the loop says. Round 3 runs only when the loop's triggers hold. After the last review, make no production edit.
+Run the validation loop with TASK = $ARGUMENTS verbatim, the brief's ACs, the confirmed answers (the plan's, the brief's and this run's), the sources (spec or source files the task or brief names, and the plan path), BASE, the file lists, the commands, the Step 2 baseline and the Step 7 results as the facts, and the Step 3 variant table. Round 1 reuses the facts, the can-fail pass included. The loop sets the size tier. Before each fix round, write and check the loop's fix plan; no edit starts before its check line. Then fix every MUST-FIX finding by following Steps 4-6, and re-check as the loop says. Round 3 runs only when the loop's triggers hold. After the last review, make no production edit.
 
 ## Step 9 - Report and stop
 Print exactly:
@@ -138,6 +141,7 @@ Dismissed findings: [finding -> evidence file:line | none]
 Needs your decision: [open items | none]
 Assumptions applied: [point -> default chosen | none]
 Not built (speculative): [items | none]
+Spend: profile [light | standard | deep], agents spawned [n], validation rounds [n], full-suite runs [n]
 Review: git diff <BASE>   new files: [...]
 Undo: git diff <BASE> -- [modified files] | git apply -R   then delete: [new files]
 Suggested commit message (not committed):

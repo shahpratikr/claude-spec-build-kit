@@ -3,8 +3,9 @@
 
 Always denies:
   - writing a credential into any file
-  - writing to protected paths: .env files, private keys, .git internals, and Claude Code's own
-    settings and hooks (an agent that can edit its guardrails can switch them off)
+  - writing to protected paths: .env files, private keys and certificate stores, cloud and cluster credentials
+    (.azure, .kube, .netrc, .docker/config.json), .git internals, and Claude Code's own settings and hooks
+    (an agent that can edit its guardrails can switch them off)
 Optional arguments narrow it further:
   --only GLOB      allow writes only to paths matching GLOB (repeatable), e.g. --only NOTES.md
   --deny-all       allow no writes at all (read-only skills)
@@ -22,6 +23,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _guardrail_common import emit_pretooluse, find_secret_kinds, log_decision, read_payload
 
 PROTECTED = [".env", ".env.*", "*.pem", "*.key", "id_rsa*", "id_ed25519*", ".git/*", "*/.git/*",
+             "*.pfx", "*.p12", ".azure/*", "*/.azure/*", ".kube/*", "*/.kube/*", ".netrc", "*/.netrc",
+             ".docker/config.json", "*/.docker/config.json",
              ".claude/settings*.json", "*/.claude/settings*.json", ".claude/hooks/*", "*/.claude/hooks/*"]
 TEMPLATE_SUFFIXES = (".example", ".sample", ".template")
 
