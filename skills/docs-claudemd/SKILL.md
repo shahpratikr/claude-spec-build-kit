@@ -1,5 +1,5 @@
 ---
-name: spec-claudemd
+name: docs-claudemd
 description: Generate or refresh a lean CLAUDE.md from the code, the plan file, the PRD and ARCHITECTURE.md - enough to make a change on its own (commands, test rules, conventions, invariants, constraints), pointing to the docs instead of importing them
 argument-hint: "<plan file .md>"
 model: sonnet
@@ -59,7 +59,7 @@ If a call is denied with [guardrail:...], do not retry it another way: list it w
 ## Step 0 - Detect current state
 - Plan file: the .md path in $ARGUMENTS. With none, glob for likely plans (`docs/plans/*.md`, `PLAN.md`, `*plan*.md`) and ask for it as a BLOCKING question (category "input"), offering what you found plus "No plan file". Wait for the answer.
 - Does CLAUDE.md exist? If yes, read it first. Preserve hand-written lines that still hold; merge rather than overwrite.
-- Find the PRD and ARCHITECTURE.md (project-docs, Files). Read them and the plan: CLAUDE.md points to the two docs and must not repeat them. If CLAUDE.md `@`-imports either doc, this run replaces the import with the Project docs map. Invariants, import and layering rules, and placement rules that ARCHITECTURE.md still holds move here; report them for /spec-arch to remove (project-docs rule 8).
+- Find the PRD and ARCHITECTURE.md (project-docs, Files). Read them and the plan: CLAUDE.md points to the two docs and must not repeat them. If CLAUDE.md `@`-imports either doc, this run replaces the import with the Project docs map. Invariants, import and layering rules, and placement rules that ARCHITECTURE.md still holds move here; report them for /docs-arch to remove (project-docs rule 8).
 
 ## Step 1 - Gather evidence
 - Commands: install, build, dev/run, lint, format, typecheck, test (all), test (single file), test (single test), coverage, generate. CI config is the source of truth for what really runs. With no code yet, take them from the plan's Design section.
@@ -74,10 +74,10 @@ Sample at least 3 files per area before claiming a convention. If two competing 
 What the skills read from CLAUDE.md; each must be present, or stated as "none":
 | Reader | Needs |
 |---|---|
-| build-phase | test (all), test (single file), test (single test), lint, typecheck, build; test layout, naming, fixtures and mocking; known baseline failures; conventions; invariants; off-limits and generated files; the docs map |
+| build-task | test (all), test (single file), test (single test), lint, typecheck, build; test layout, naming, fixtures and mocking; known baseline failures; conventions; invariants; off-limits and generated files; the docs map |
 | validation loop reviewers | the same commands; conventions, invariants and constraints, each with evidence, because a broken CLAUDE.md rule is BLOCKING |
 | followup | the build, test and generate commands; conventions; invariants; the docs map |
-| spec-interview | the test framework and command; invariants |
+| plan-task | the test framework and command; invariants |
 
 ## Step 2 - Verify
 Run each command once (use --help or a dry run for anything slow or destructive, and say so). Record pass/fail. A command whose code does not exist yet is not run: it is written with "(planned)". If the baseline test suite fails, list the failing tests under "Known baseline failures". Do NOT fix them here.
@@ -97,7 +97,7 @@ Run each command once (use --help or a dry run for anything slow or destructive,
 ## Testing
 - Layout, naming, fixtures, mocking rules, which level (unit/integration) for what
 - Known baseline failures: [names, or none]
-(build-phase and its validation loop read this section - keep it exact)
+(build-task and its validation loop read this section - keep it exact)
 
 ## Conventions
 - [one rule per line, 10-20 lines max, each evidence-backed; where new files go]
@@ -128,4 +128,4 @@ Run each command once (use --help or a dry run for anything slow or destructive,
 8. If any check fails, fix it and run all checks again. Save only when every check passes, at most 3 rounds.
 
 ## Save
-Write CLAUDE.md. Print "CLAUDE.md saved - [N] lines", whether it was a fresh write or a merge/update (with what changed), the duplicates line, what moved here from ARCHITECTURE.md ("run /spec-arch to remove it there"), and a list of any commands you could not verify or marked planned. Stop.
+Write CLAUDE.md. Print "CLAUDE.md saved - [N] lines", whether it was a fresh write or a merge/update (with what changed), the duplicates line, what moved here from ARCHITECTURE.md ("run /docs-arch to remove it there"), and a list of any commands you could not verify or marked planned. Stop.

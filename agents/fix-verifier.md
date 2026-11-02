@@ -1,5 +1,5 @@
 ---
-name: gap-rechecker
+name: fix-verifier
 description: >
   Read-only reviewer for validation-loop re-check rounds (round 2 and
   later). Challenges the findings ledger's confirmations and reviews

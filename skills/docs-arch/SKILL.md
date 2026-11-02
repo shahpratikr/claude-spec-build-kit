@@ -1,5 +1,5 @@
 ---
-name: spec-arch
+name: docs-arch
 description: Create or update docs/ARCHITECTURE.md from the code and the plan file - repository structure, components, data, flows, interfaces, configuration and decisions, with no product overview, invariants or plan material
 argument-hint: "<plan file .md> [what to cover]"
 model: sonnet
@@ -33,15 +33,15 @@ hooks:
 
 ROLE: Software architect writing the reference a new engineer uses to find their way around the code and to understand how it works
 TASK: Create or update the project's architecture document from: $ARGUMENTS
-CONTEXT: The code is the architecture where it exists. The plan file from /spec-interview holds the design decisions for what is not built yet. Sources of truth, in order: the code, the plan's Design section, the user's answers, the existing ARCHITECTURE.md (its decisions stand unless one of the sources before it changes them), the PRD, existing decision records. Doc ownership: @${CLAUDE_SKILL_DIR}/../../shared/project-docs.md Question round: @${CLAUDE_SKILL_DIR}/../../shared/question-round.md Guardrails setup: ${CLAUDE_SKILL_DIR}/../../shared/guardrails-setup.md, read only when Glob finds no guard_bash.py in `.claude/hooks/guardrails/` under the project or in `~/.claude/hooks/guardrails/` (when it finds one, guardrails are active and nothing else is needed)
+CONTEXT: The code is the architecture where it exists. The plan file from /plan-task holds the design decisions for what is not built yet. Sources of truth, in order: the code, the plan's Design section, the user's answers, the existing ARCHITECTURE.md (its decisions stand unless one of the sources before it changes them), the PRD, existing decision records. Doc ownership: @${CLAUDE_SKILL_DIR}/../../shared/project-docs.md Question round: @${CLAUDE_SKILL_DIR}/../../shared/question-round.md Guardrails setup: ${CLAUDE_SKILL_DIR}/../../shared/guardrails-setup.md, read only when Glob finds no guard_bash.py in `.claude/hooks/guardrails/` under the project or in `~/.claude/hooks/guardrails/` (when it finds one, guardrails are active and nothing else is needed)
 CONSTRAINTS: Write only ARCHITECTURE.md, and only what project-docs says it owns. No product purpose, users or non-goals (point to the PRD). No build or test commands, coding conventions, placement rules, import rules or invariants: CLAUDE.md owns the rules a change must keep (project-docs rule 2). Take decisions from the plan, never its task material (project-docs rule 4). Make no design decision of your own: a decision that neither the code nor the plan settles is a question. Describe existing patterns; do not redesign or propose refactors unless asked. If a call is denied with [guardrail:...], do not retry it another way: report it.
 
 ## Step 0 - Detect
 Run the guardrails setup first.
 1. Plan file: the .md path in $ARGUMENTS. With none, glob for likely plans (`docs/plans/*.md`, `PLAN.md`, `*plan*.md`) and ask for it as a BLOCKING question (category "input"), offering what you found plus "No plan file". Wait for the answer.
-2. Find ARCHITECTURE.md (project-docs, Files). If it exists, read it: this run updates it, keeping what still holds and removing what it does not own. Invariants, import and layering rules and placement rules move to CLAUDE.md: remove each one only when CLAUDE.md already holds it; otherwise keep it and report "run /spec-claudemd to move it".
+2. Find ARCHITECTURE.md (project-docs, Files). If it exists, read it: this run updates it, keeping what still holds and removing what it does not own. Invariants, import and layering rules and placement rules move to CLAUDE.md: remove each one only when CLAUDE.md already holds it; otherwise keep it and report "run /docs-claudemd to move it".
 3. Read the plan, the PRD and CLAUDE.md if they exist.
-4. Mode: AS-BUILT when the repo has code; the plan adds planned changes, marked planned. DESIGN when it has none; the plan and the existing ARCHITECTURE.md are the source. No code, no plan and no ARCHITECTURE.md: say to run /spec-interview first, and stop.
+4. Mode: AS-BUILT when the repo has code; the plan adds planned changes, marked planned. DESIGN when it has none; the plan and the existing ARCHITECTURE.md are the source. No code, no plan and no ARCHITECTURE.md: say to run /plan-task first, and stop.
 5. Print one line: fresh or update; the mode; the sources read.
 
 ## Step 1 - Gather
@@ -105,4 +105,4 @@ Check the draft, fix what fails and check again, at most 2 rounds:
 - architecture only: product facts point to the PRD, and commands, conventions, placement rules and invariants stay in CLAUDE.md
 - no task material and no provenance (project-docs rules 4 and 5)
 - the duplicate check in project-docs
-Write ARCHITECTURE.md. Print "ARCHITECTURE saved - <path>, <n> lines, fresh | updated (<what changed>)", the duplicates line, plan-versus-code conflicts, rules kept until /spec-claudemd moves them, and anything reported for the other files. Stop.
+Write ARCHITECTURE.md. Print "ARCHITECTURE saved - <path>, <n> lines, fresh | updated (<what changed>)", the duplicates line, plan-versus-code conflicts, rules kept until /docs-claudemd moves them, and anything reported for the other files. Stop.

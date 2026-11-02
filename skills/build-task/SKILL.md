@@ -1,5 +1,5 @@
 ---
-name: build-phase
+name: build-task
 description: Implement one task in an existing codebase end to end - recon, brief, tests first, implement, then validate with independent reviewers, fix and re-validate until clean. Never commits.
 argument-hint: "<task description | Task Brief>"
 model: sonnet
@@ -48,8 +48,8 @@ Live state (verify these render; if they appear as literal text, run the git com
 ## Step 0 - Preconditions and snapshot
 - If $ARGUMENTS is empty, ask for the task and stop.
 - If the live state says "not a git repository" and the task names a repository (a path, or a plan whose files sit in one), warn in one line: "This session started outside <repo>, so Claude Code did not load its CLAUDE.md, settings or memory, and hooks see <cwd> as the project. Start Claude Code in the repository root next time." Then read `<repo>/CLAUDE.md` yourself, run every git command as `git -C <repo> ...` and continue. With no repository named, ask for it as a BLOCKING question.
-- If the task is to write or update the PRD, ARCHITECTURE.md or CLAUDE.md, name the skill that owns that file (/spec-prd, /spec-arch, /spec-claudemd) and stop.
-- If $ARGUMENTS names a plan file (a `/spec-interview` handoff carries `Plan: <path>`), read the plan file: its Brief with the confirmed answers, its Design, its Blast radius and the row of the named step. Those decisions bind the build.
+- If the task is to write or update the PRD, ARCHITECTURE.md or CLAUDE.md, name the skill that owns that file (/docs-prd, /docs-arch, /docs-claudemd) and stop.
+- If $ARGUMENTS names a plan file (a `/plan-task` handoff carries `Plan: <path>`), read the plan file: its Brief with the confirmed answers, its Design, its Blast radius and the row of the named step. Those decisions bind the build.
 - Run the guardrails setup before anything else.
 - Snapshot the starting state so the change can be validated without a commit. Run `git stash create`: it prints a hash that records the tracked files as they are now, without touching the working tree or index. BASE is that hash, or the output of `git rev-parse HEAD` when it prints nothing. Record BASE and the output of `git status --porcelain --untracked-files=all`.
 - Find commands: CLAUDE.md (Commands + Testing) first, then package scripts / Makefile / CI config. An unknown test command is a BLOCKING question. Never substitute a guess. When CLAUDE.md and CI name no test command, read ${CLAUDE_SKILL_DIR}/../../shared/verification-profiles.md and ask the question with a recommended option from its table.
@@ -66,7 +66,7 @@ Run the full test command (plus lint/typecheck if they exist) BEFORE editing. Re
 
 ## Step 3 - Task Brief + Test Plan (no approval gate)
 Write these in your reply before creating any file, so the user can follow the build:
-1. Task Brief: goal, in/out of scope (at least 3 out), ACs (AC-1..n, "The system shall ..."), assumptions with the default you chose, blocking questions. If $ARGUMENTS already contains ACs from /spec-interview, reuse them verbatim. When a plan was read, reuse the plan's confirmed answers and scenario coverage, and derive only what the plan lacks.
+1. Task Brief: goal, in/out of scope (at least 3 out), ACs (AC-1..n, "The system shall ..."), assumptions with the default you chose, blocking questions. If $ARGUMENTS already contains ACs from /plan-task, reuse them verbatim. When a plan was read, reuse the plan's confirmed answers and scenario coverage, and derive only what the plan lacks.
 2. Test Plan: apply the checklist. One row per category: APPLICABLE (scenarios -> test name -> level -> file) or N/A (the grep or file that proves it).
 3. File tree: files to create/modify, each marked new/modified and "mirrors <existing file>".
 4. Anything beyond the ACs is SPECULATIVE: do not build it; list it in the report.
@@ -74,8 +74,8 @@ Write these in your reply before creating any file, so the user can follow the b
    - For every input surface the change accepts or emits (strings, paths, formats, markup, CLI arguments, closed sets), list its syntactic variants from checklist category 2. Mark each one handled, with the test that will cover it, or N/A, with a reason grounded in the code.
    - Per AC, the two most likely ways the implementation could be wrong, each mapped to a test.
    The table is your reasoning: it feeds the test plan and the validation loop's fix plans, and never goes to a reviewer.
-6. Size gate. Every review round re-reads the whole change, so one run builds at most about 10 production files. When the file tree has more, or the repository has no code yet and the task is more than its skeleton, ask one BLOCKING question (category "scope"), even though it is not about intent. The options are "Split it with /spec-interview (Recommended)", described with the file count, and "Build it all in one run", described as taking hours of review. On split, print the count and a ready line, `/spec-interview <task> docs/plans/<task-slug>.md`, and stop. A "Step N of M" task from a plan is gated the same way.
-7. Profile: print `Profile: <light | standard | deep> (<trigger or none>)` as the Task profile says, and pass it to the validation loop (a deep profile adds criteria-auditor at size tier S).
+6. Size gate. Every review round re-reads the whole change, so one run builds at most about 10 production files. When the file tree has more, or the repository has no code yet and the task is more than its skeleton, ask one BLOCKING question (category "scope"), even though it is not about intent. The options are "Split it with /plan-task (Recommended)", described with the file count, and "Build it all in one run", described as taking hours of review. On split, print the count and a ready line, `/plan-task <task> docs/plans/<task-slug>.md`, and stop. A "Step N of M" task from a plan is gated the same way.
+7. Profile: print `Profile: <light | standard | deep> (<trigger or none>)` as the Task profile says, and pass it to the validation loop (a deep profile adds ac-auditor at size tier S).
 Ask any BLOCKING question now (see QUESTIONS), then continue. Do not wait for approval.
 
 ## Step 4 - Tests first

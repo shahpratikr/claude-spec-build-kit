@@ -1,8 +1,8 @@
 ---
 name: plan-auditor
 description: >
-  Use this agent to review a finished plan file from spec-interview
-  before it is handed to build-phase. Pass plan_file, the task text and
+  Use this agent to review a finished plan file from plan-task
+  before it is handed to build-task. Pass plan_file, the task text and
   the confirmed answers. Returns a findings list or "no plan findings".
 model: sonnet
 effort: high
@@ -52,7 +52,7 @@ If plan_file is empty or not readable, output exactly: `ERROR: no plan_file prov
    h. Speculative additions: a dependency, abstraction, file, config key or pattern that no AC requires.
    i. Handoff: every handoff line names the plan path and carries every AC of its step.
 
-3. Mark each finding HIGH when build-phase would build the wrong thing or fail (an untestable AC, a step that uses a symbol not yet created, an unlisted caller, a contradiction).
+3. Mark each finding HIGH when build-task would build the wrong thing or fail (an untestable AC, a step that uses a symbol not yet created, an unlisted caller, a contradiction).
    Mark it MED when a scenario or a decision is left uncovered.
    Mark it LOW when it only drifts from the plan's own conventions.
 

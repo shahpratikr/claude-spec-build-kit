@@ -1,6 +1,6 @@
 # Validation Loop
 
-Used by build-phase (Step 8) and followup (IMPLEMENT). It validates uncommitted changes, so nothing has to be committed first.
+Used by build-task (Step 8) and followup (IMPLEMENT). It validates uncommitted changes, so nothing has to be committed first.
 
 RULE: intent comes from TASK, the ACs and the user's confirmed answers, never from the diff. A validator that infers the spec from the implementation will approve the implementation. Reviewers receive intent, sources and file lists, never the author's reasoning, notes, variant table or fix plan. From round 2 they also get the findings ledger, and may challenge the evidence in it.
 
@@ -25,7 +25,7 @@ SHORT OUTPUT: everything a command prints stays in context for the rest of the r
 
 ## Size tier
 Set once, before round 1, from `git diff <BASE> --stat` plus the line counts of new files, production and test files together:
-- S: at most 3 files and 80 changed lines. Round 1 spawns gap-hunter alone. The calling skill maps each AC to its code and its assertion line (file:line) itself, and puts that map into the facts. A deep profile (see the task profile) also spawns criteria-auditor at this tier.
+- S: at most 3 files and 80 changed lines. Round 1 spawns gap-hunter alone. The calling skill maps each AC to its code and its assertion line (file:line) itself, and puts that map into the facts. A deep profile (see the task profile) also spawns ac-auditor at this tier.
 - M: anything larger, up to the size gate. Round 1 spawns all three reviewers.
 - L: over the size gate, built in one run at the user's choice. All three reviewers, and the record says so.
 
@@ -66,7 +66,7 @@ Do not run it again in the same round, or after the last round unless code chang
 1. Facts first. Run the full test command, plus lint, typecheck and build where they exist, and the can-fail pass. If the calling skill ran them after its last edit, reuse those results instead. Mark each failure new or pre-existing (baseline). Re-run new or changed tests 3 times when they involve time, async, concurrency or randomness.
 2. Write the brief once: `round<n>-brief.md` in your scratchpad directory (`mktemp -d` when there is no scratchpad), holding TASK, ACs, confirmed answers, sources, BASE, the file lists, the commands and the facts. Never the variant table or a fix plan.
 3. Spawn the reviewers the size tier names, in parallel with the Agent tool, by subagent type, in the foreground (ONE TURN). Each prompt gives the brief's path, the scratchpad path for probe scripts, and the line "Read-only: never create, edit or delete files in the repository. The facts in the brief are final: do not run the suite, lint, typecheck, build or a mutation sweep." gap-hunter also gets the scenario checklist path. If a type is not installed, use general-purpose with the same prompt.
-   - criteria-auditor: per AC, the implementing code and a test that would fail if it broke (YES / PARTIAL / NO); requirements in TASK that no AC covers; ACs not grounded in TASK, the confirmed answers, the sources or the code; ACs no finite check can verify; unrequested changes.
+   - ac-auditor: per AC, the implementing code and a test that would fail if it broke (YES / PARTIAL / NO); requirements in TASK that no AC covers; ACs not grounded in TASK, the confirmed answers, the sources or the code; ACs no finite check can verify; unrequested changes.
    - gap-hunter: every uncovered scenario and defect, ranked HIGH / MED / LOW, with every location of each one. No cap. It may prove a suspected defect with a small probe script in the scratchpad.
    - convention-checker: changed files and BASE; violations of CLAUDE.md (conventions, invariants, constraints), or of sibling files when CLAUDE.md is missing, each marked BLOCKING or MINOR. When the calling skill requires AC ids in test names, say so in the prompt so they are not reported.
 4. Wait for all of them, then triage every finding:
@@ -86,8 +86,8 @@ Do not run it again in the same round, or after the last round unless code chang
    - a convention item is fixed when a search over the change finds the pattern nowhere.
    Mark each item fixed or not fixed in the ledger, with that evidence. An item you cannot confirm this way stays with its reviewer (step 3).
 3. Spawn only the reviewers the round needs, in parallel and in the foreground (ONE TURN):
-   - gap-rechecker whenever the fixes changed production code, tests or docs. Fixes are where new defects come from, and it reviews every changed line, each fix included. It also gets the scenario checklist path;
-   - criteria-auditor whenever an AC was added, changed or removed, or one of its items could not be confirmed in step 2;
+   - fix-verifier whenever the fixes changed production code, tests or docs. Fixes are where new defects come from, and it reviews every changed line, each fix included. It also gets the scenario checklist path;
+   - ac-auditor whenever an AC was added, changed or removed, or one of its items could not be confirmed in step 2;
    - convention-checker whenever the fixes created a file, or one of its items could not be confirmed in step 2.
    Record each skipped reviewer with its reason.
 4. Write `round<n>-brief.md` with everything the round 1 brief held (never the variant table or a fix plan), the new facts, the ledger with your confirmations, PREV, and this scope:
@@ -95,7 +95,7 @@ Do not run it again in the same round, or after the last round unless code chang
    - Review the delta, with your full method: `git diff --no-index "$PREV/<file>" <file>` for each file, and files that are not in PREV in full. Include the code that calls or depends on the changed lines.
    - Outside the delta, report only HIGH findings.
    - Do not report a DISMISS or OPTIONAL ledger item again unless its evidence is wrong; then say why.
-5. Triage as in round 1, with one difference: a new MED or LOW finding outside the delta is OPTIONAL. List it; do not loop on it. A challenged confirmation is MUST-FIX again. Count gap-rechecker's FIX and MISSED origins, and each round-1 auditor YES that this round shows was wrong, for the record.
+5. Triage as in round 1, with one difference: a new MED or LOW finding outside the delta is OPTIONAL. List it; do not loop on it. A challenged confirmation is MUST-FIX again. Count fix-verifier's FIX and MISSED origins, and each round-1 auditor YES that this round shows was wrong, for the record.
 6. Then steps 5 to 7 of round 1.
 
 ## Round 3: only when needed

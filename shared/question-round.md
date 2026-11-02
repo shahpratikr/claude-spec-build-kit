@@ -1,6 +1,6 @@
 # Question Round
 
-Every question a skill puts to the user goes through this file, wherever a skill or shared step says "ask": clarification rounds, keep-or-cut gates, file paths, design decisions, NEEDS DECISION items from the validation loop, mid-run questions in build-phase and followup, and the guardrails setup. Used by spec-interview, spec-prd, spec-arch, spec-claudemd, followup, build-phase, the validation loop and the guardrails setup. It decides how questions reach the user, so every skill asks the same way.
+Every question a skill puts to the user goes through this file, wherever a skill or shared step says "ask": clarification rounds, keep-or-cut gates, file paths, design decisions, NEEDS DECISION items from the validation loop, mid-run questions in build-task and followup, and the guardrails setup. Used by plan-task, docs-prd, docs-arch, docs-claudemd, followup, build-task, the validation loop and the guardrails setup. It decides how questions reach the user, so every skill asks the same way.
 
 ## Before asking
 Give every question these parts:
@@ -19,7 +19,7 @@ Shape each question to fit the picker:
 
 Before a round of two or more questions, print as text:
 - "Resolved from code (challenge me if wrong)": item -> file:line and the quoted line
-- "Dropped questions" and the "Assumption register", when the skill keeps them (spec-interview): each dropped question with its one-line reason, each assumption verified from code or asked
+- "Dropped questions" and the "Assumption register", when the skill keeps them (plan-task): each dropped question with its one-line reason, each assumption verified from code or asked
 - "Recommended path": 2-4 lines on what happens if the user accepts every recommendation
 - one count line, for example "11 questions: 5 blocking, 6 non-blocking, in 3 dialogs"
 
@@ -30,7 +30,7 @@ Before a round of two or more questions, print as text:
 - options: the recommended one first, its label ending in "(Recommended)" and its description giving the reason and the confidence tag. Every other description says what choosing it changes. Labels are at most 5 words. Do not add an "Other" option: the picker adds one for typed answers, so a question that needs a name, number or date still offers 2-4 likely values.
 - multiSelect only when the options do not exclude each other.
 
-Mid-run questions (build-phase, followup IMPLEMENT, the validation loop) are asked the moment they arise, in the same format, and the run continues in this turn once they are answered. Code the answer affects stays untouched until then.
+Mid-run questions (build-task, followup IMPLEMENT, the validation loop) are asked the moment they arise, in the same format, and the run continues in this turn once they are answered. Code the answer affects stays untouched until then.
 
 Subagents never ask the user. They list open questions in their report, and the calling skill asks them in its next round.
 

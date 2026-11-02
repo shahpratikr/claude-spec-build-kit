@@ -1,7 +1,7 @@
 ---
 name: question-prober
 description: >
-  Independent question generator used by spec-interview on a deep task.
+  Independent question generator used by plan-task on a deep task.
   Reads the task, the recon digest and the code, walks four lenses
   (contract, state, failure, verification) and reports every question the
   code and the task text cannot answer. Never sees the planner's questions.

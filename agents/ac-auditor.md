@@ -1,5 +1,5 @@
 ---
-name: criteria-auditor
+name: ac-auditor
 description: >
   Read-only QA reviewer used by the validation loop. Checks uncommitted
   changes against the task and its acceptance criteria: the code and a

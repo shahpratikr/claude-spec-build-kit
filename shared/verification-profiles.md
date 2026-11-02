@@ -1,6 +1,6 @@
 # Verification Profiles
 
-Read by build-phase when CLAUDE.md and CI name no test command, and by spec-interview probe DP7. Commands from CLAUDE.md or CI always come first. This table only supplies a recommended option to put in the BLOCKING question.
+Read by build-task when CLAUDE.md and CI name no test command, and by plan-task probe DP7. Commands from CLAUDE.md or CI always come first. This table only supplies a recommended option to put in the BLOCKING question.
 
 | Signal | Static checks | Dry-run or tests |
 | --- | --- | --- |

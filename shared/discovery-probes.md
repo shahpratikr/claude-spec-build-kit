@@ -1,6 +1,6 @@
 # Discovery Probes
 
-Used by spec-interview. Every probe gets an answer from one of four sources: a question for the user; "resolved by code" with file:line and the quoted line; a quote from the task text; or "N/A" with the grep or file that proves it. A bare "resolved by code", or an N/A without that proof, counts as unanswered. The DP prefix keeps these numbers apart from the scenario checklist's.
+Used by plan-task. Every probe gets an answer from one of four sources: a question for the user; "resolved by code" with file:line and the quoted line; a quote from the task text; or "N/A" with the grep or file that proves it. A bare "resolved by code", or an N/A without that proof, counts as unanswered. The DP prefix keeps these numbers apart from the scenario checklist's.
 
 ## Core probes
 - DP1 Intent and scope: outcome per consumer in one sentence; what must not change; explicit non-goals; who is affected that the task does not name; how success is measured; deadline or rollout constraint.

@@ -37,7 +37,7 @@ PROBES: probes are your strongest tool for defects. When reading cannot settle a
 - scratchpad: where probe scripts go
 - checklist: path to the scenario checklist
 
-You run in round 1 only. Re-check rounds use gap-rechecker.
+You run in round 1 only. Re-check rounds use fix-verifier.
 
 ## Task
 1. Read the checklist. Read the production diff (`git diff <BASE>`, plus new files), the callers of changed code and the sources FIRST.

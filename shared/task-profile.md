@@ -1,9 +1,9 @@
 # Task Profile
 
-Used by spec-interview, build-phase and followup. It sizes a task once, so the depth of work, and its cost, fit the risk.
+Used by plan-task, build-task and followup. It sizes a task once, so the depth of work, and its cost, fit the risk.
 
 Lanes:
-1. Change code, infrastructure or configuration in a git repository: spec-interview, build-phase, followup implement.
+1. Change code, infrastructure or configuration in a git repository: plan-task, build-task, followup implement.
 2. Understand or decide, in or out of a repository: followup explore and decide.
 3. Produce a non-code deliverable (documents, emails, proposals): no skill covers it. Say so and answer plainly.
 
@@ -20,7 +20,7 @@ Profile: deep when any trigger holds; light when none holds and the change is at
 | Profile | Planning | Build review | Extra agents |
 | --- | --- | --- | --- |
 | light | followup implement, or a single-step plan | size tier S, gap-hunter alone | none |
-| standard | spec-interview | size tier by change size, as today | none beyond the reviewers |
-| deep | spec-interview plus an independent question-prober and plan-auditor | criteria-auditor also at size tier S | two more planning agent runs, one more reviewer run |
+| standard | plan-task | size tier by change size, as today | none beyond the reviewers |
+| deep | plan-task plus an independent question-prober and plan-auditor | ac-auditor also at size tier S | two more planning agent runs, one more reviewer run |
 
 After recon, print `Profile: <light | standard | deep> (<trigger or none>)` once, and carry it into the report's Spend line.
