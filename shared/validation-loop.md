@@ -8,7 +8,7 @@ GOAL: round 1 finds nearly everything, round 2 closes what is left, and round 3 
 
 FACTS ONCE: the calling skill runs the tests, checks and the can-fail pass, and reviewers read the results. A reviewer that runs the suite or a mutation sweep again spends minutes and learns nothing new. Never tell a reviewer to run them, and add nothing to a reviewer prompt that contradicts the reviewer's own instructions.
 
-ONE TURN: the whole loop runs in the calling skill's turn. Spawn reviewers in the foreground and wait for them. Never use `run_in_background`, Monitor or a background Agent for tests, the can-fail pass or reviewers: each notification arrives as a new turn, and from then on the run has lost the skill's model, effort, tool pre-approvals and hooks. A command that may outlast the Bash timeout gets the maximum timeout, or is split into parts that each fit.
+ONE TURN: the whole loop runs in the calling skill's turn. Spawn reviewers in the foreground and wait for them. Never pass a model or effort parameter when spawning one: every reviewer runs on the session's model and effort, and a per-call value would override that. Never use `run_in_background`, Monitor or a background Agent for tests, the can-fail pass or reviewers: each notification arrives as a new turn, and from then on the run has lost the skill's tool pre-approvals and hooks. A command that may outlast the Bash timeout gets the maximum timeout, or is split into parts that each fit.
 
 SHORT OUTPUT: everything a command prints stays in context for the rest of the run. Write full logs to the scratchpad and print only what the next decision needs: `<cmd> > "$SCR/<name>.log" 2>&1; echo "exit $?"; tail -n 40 "$SCR/<name>.log"`. Read a log further only for the failure you are fixing.
 

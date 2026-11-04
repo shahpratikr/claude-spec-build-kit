@@ -2,8 +2,6 @@
 name: followup
 description: Follow-up on the current task - explore, decide, or implement. Lists every clarifying question, each with a recommendation, before acting
 argument-hint: "[explore: | decide: | implement:] <follow-up>"
-model: claude-sonnet-5-5
-effort: xhigh
 allowed-tools: Read, Grep, Glob, Edit, Write, Agent, Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git stash create:*), Bash(git rev-parse:*)
 hooks:
   PreToolUse:
@@ -38,7 +36,7 @@ Question round: @${CLAUDE_SKILL_DIR}/../../shared/question-round.md Task profile
 Guardrails setup: ${CLAUDE_SKILL_DIR}/../../shared/guardrails-setup.md, read only when Glob finds no guard_bash.py in `.claude/hooks/guardrails/` under the project or in `~/.claude/hooks/guardrails/` (when it finds one, guardrails are active and nothing else is needed).
 In IMPLEMENT mode, read ${CLAUDE_SKILL_DIR}/../../shared/scenario-checklist.md and ${CLAUDE_SKILL_DIR}/../../shared/validation-loop.md when it begins (items 1 and 6 below); EXPLORE and DECIDE never load them.
 CONSTRAINTS: Never commit (with guardrails installed, a hook also makes any `git commit` wait for a human click). If a call is denied with [guardrail:...], do not retry it another way: report it. Stay inside the scope of this follow-up. No drive-by refactors. Any assumption you would otherwise make becomes a question. Do not edit files in EXPLORE or DECIDE mode, or before the clarification round (Step 2) is closed.
-ONE TURN: never use `run_in_background`, Monitor or a background agent. A notification arrives as a new turn, and from then on the follow-up has lost this skill's model, effort, tool pre-approvals and hooks.
+ONE TURN: never use `run_in_background`, Monitor or a background agent. A notification arrives as a new turn, and from then on the follow-up has lost this skill's tool pre-approvals and hooks.
 CONTEXT BUDGET: everything you read or print stays in context and is paid for again on every call. Grep before you read; for a file over about 300 lines, Read with offset and limit around the hits. Never print a whole file through Bash. Run tests and checks as the validation loop's SHORT OUTPUT says.
 
 ## Step 0 - Classify and restate

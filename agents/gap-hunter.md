@@ -6,8 +6,7 @@ description: >
   scenario checklist and small probe scripts. Pass a brief (TASK, ACs,
   confirmed answers, sources, BASE, the changed and new files, the test
   and can-fail results), a scratchpad path and the checklist path.
-model: claude-sonnet-5-5
-effort: xhigh
+model: inherit
 tools: Read, Glob, Grep, Bash
 permissionMode: dontAsk
 hooks:

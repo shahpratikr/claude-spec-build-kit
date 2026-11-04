@@ -6,8 +6,7 @@ description: >
   is no CLAUDE.md. Pass changed_files as a list of file paths, and
   BASE when the changes are uncommitted. Returns violations list or
   "no violations".
-model: claude-sonnet-5-5
-effort: medium
+model: inherit
 tools: Read, Glob, Grep, Bash
 permissionMode: dontAsk
 hooks:

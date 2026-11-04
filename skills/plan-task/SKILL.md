@@ -2,8 +2,6 @@
 name: plan-task
 description: Plan one task or a new project - recon, every clarifying question with a recommendation, then a plan file (ACs, scenario coverage, design decisions, buildable steps, /build-task lines) written to the .md path the user names
 argument-hint: "<task description> [plan file .md]"
-model: claude-sonnet-5-5
-effort: xhigh
 allowed-tools: Read, Glob, Grep, Agent, Bash(git log:*), Bash(git status:*), Bash(git ls-files:*)
 hooks:
   PreToolUse:
@@ -37,7 +35,7 @@ CONTEXT: An existing codebase or a new project. Sources of truth, in order: the 
 Doc ownership: @${CLAUDE_SKILL_DIR}/../../shared/project-docs.md Scenario checklist: @${CLAUDE_SKILL_DIR}/../../shared/scenario-checklist.md Discovery probes: @${CLAUDE_SKILL_DIR}/../../shared/discovery-probes.md Task profile: @${CLAUDE_SKILL_DIR}/../../shared/task-profile.md Question round: @${CLAUDE_SKILL_DIR}/../../shared/question-round.md
 Guardrails setup: ${CLAUDE_SKILL_DIR}/../../shared/guardrails-setup.md, read only when Glob finds no guard_bash.py in `.claude/hooks/guardrails/` under the project or in `~/.claude/hooks/guardrails/` (when it finds one, guardrails are active and nothing else is needed)
 CONSTRAINTS: No code changes. Write only the plan file: never PRD.md, ARCHITECTURE.md or CLAUDE.md, and never write through shell commands. The guardrails setup is the one exception: it installs its scripts only after the user says yes. When guardrails are installed, a hook denies destructive git commands and reads of credential files; if a call is denied with [guardrail:...], do not retry it another way: report it. Every AC must trace to the task text, the code, or a user answer - never invent requirements. Any assumption you would otherwise make is verified from code (file:line) or becomes a question, and the Assumption register (Step 1) lists every one. Do not draft the plan before the clarification round (Step 1) is closed. Existing patterns beat new patterns: any deviation needs a stated reason. Commit to one option per design decision.
-ONE TURN: the whole planning run happens in this turn. Never use `run_in_background`, Monitor or a background agent: a notification arrives as a new turn, and from then on the run has lost this skill's model, effort, tool pre-approvals and hooks. The question-prober and the plan-auditor, when spawned, run in the foreground.
+ONE TURN: the whole planning run happens in this turn. Never use `run_in_background`, Monitor or a background agent: a notification arrives as a new turn, and from then on the run has lost this skill's tool pre-approvals and hooks. The question-prober and the plan-auditor, when spawned, run in the foreground, and never with a model or effort parameter: they run on the session's.
 OUTPUT FORMAT: the plan file (Step 5), plus the paste-ready /build-task lines in the reply
 
 

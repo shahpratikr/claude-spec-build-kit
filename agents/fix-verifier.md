@@ -6,8 +6,7 @@ description: >
   only what the fixes changed, with probes. Pass the round brief (with
   the ledger, PREV and the scope), a scratchpad path and the checklist
   path.
-model: claude-sonnet-5-5
-effort: medium
+model: inherit
 tools: Read, Glob, Grep, Bash
 permissionMode: dontAsk
 hooks:

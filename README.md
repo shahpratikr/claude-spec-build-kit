@@ -61,7 +61,7 @@ Then start a new Claude Code session.
 
 ### Recommended settings
 
-**Turn fork mode off.** This setting matters most. build-task waits for its reviewers. In interactive sessions (terminal, VS Code, desktop app), Claude can only wait for a subagent when fork mode is off. If it can't wait, the reviewers' reports arrive later as new turns. The rest of the build then runs without the skill's tool pre-approvals, so you get permission prompts, and on your default model and effort instead of the skill's. Measured on 19 builds with fork mode on: every one left the skill at the first reviewer hand-back or background notification, and 35-45% of each build ran outside it. The skills also never run commands in the background, for the same reason. plan-task waits for its `question-prober` and `plan-auditor` the same way, so fork mode must be off for it too.
+**Turn fork mode off.** This setting matters most. build-task waits for its reviewers. In interactive sessions (terminal, VS Code, desktop app), Claude can only wait for a subagent when fork mode is off. If it can't wait, the reviewers' reports arrive later as new turns. The rest of the build then runs without the skill's tool pre-approvals and hooks, so you get permission prompts. Measured on 19 builds with fork mode on: every one left the skill at the first reviewer hand-back or background notification, and 35-45% of each build ran outside it. The skills also never run commands in the background, for the same reason. plan-task waits for its `question-prober` and `plan-auditor` the same way, so fork mode must be off for it too.
 
 To turn fork mode off, add this to `~/.claude/settings.json`:
 
@@ -146,25 +146,17 @@ A typical task:
 
 ### Models, effort and cost
 
-Every skill and reviewer runs on Sonnet, the model Improving approves for this work. Where a skill writes code, makes design decisions or writes a file every later session relies on, structure carries the load instead of a bigger model: quoted evidence for every claim, an independent reviewer for risky tasks, and checks that run outside the model (tests, the can-fail pass, the guardrail self-test, the promptfoo suite). Both `model:` and `effort:` in the frontmatter are honored: a skill's values override the session's for as long as the run stays inside the skill.
+No skill or agent pins a model or an effort level: everything runs on what the session is set to. Pick both before you start (`/model`, `/effort`, or `--model` and `--effort` on the command line).
+- Skills have no `model:` or `effort:` field, so the session's model and effort apply while the skill runs.
+- Agents carry `model: inherit`, which always means the main conversation's model, even when `CLAUDE_CODE_SUBAGENT_MODEL` is set, and no `effort:` field, so on that model they run at the session's effort.
+- The skills never pass a model or effort when they spawn a reviewer, because a per-call value would override both.
+- What still overrides the session: `CLAUDE_CODE_EFFORT_LEVEL` overrides every effort level, and an organization's `availableModels` allowlist limits which models a session may use. If your organization approves only certain models for this work, that allowlist, or your own `/model` choice, is now the only thing that enforces it.
 
-| File | Model | Effort |
-| --- | --- | --- |
-| build-task | claude-sonnet-5-5 | high |
-| followup | claude-sonnet-5-5 | high |
-| plan-task, docs-arch, docs-claudemd | claude-sonnet-5-5 | high |
-| docs-prd | claude-sonnet-5-5 | high |
-| gap-hunter (round 1) | claude-sonnet-5-5 | xhigh |
-| fix-verifier (round 2 and 3) | claude-sonnet-5-5 | medium |
-| ac-auditor, convention-checker | claude-sonnet-5-5 | medium |
-| question-prober | claude-sonnet-5-5 | high |
-| plan-auditor | claude-sonnet-5-5 | high |
+What this changes from the earlier pinned setup (Sonnet everywhere; gap-hunter at `xhigh`, the auditors and fix-verifier at `medium`, the skills at `high` or `xhigh`):
+- **Cost follows the session.** A session on a larger model at a high effort runs every reviewer that way too, and a build spawns up to about 7 reviewer runs.
+- **No per-reviewer tuning.** gap-hunter gets the same effort as the auditors. To tune one locally, add `effort:` (or `model:`) to your installed copy of its agent file; a re-copy overwrites it.
 
-A skill's `effort:` is honored, and so is an agent's. Checked in a headless sandbox run (Claude Code 2.1.308, 2026-11-01) with throwaway skills: `effort: low`, `effort: high` and no field gave `low`, `high` and the session's `xhigh` on every main-thread call. The skill kept its model and attribution after each reviewer returned, and each of the four reviewers ran in the foreground at the effort in the table.
-
-build-task and followup run at `effort: high`, the target an A/B run was meant to confirm. That A/B has not been completed, so `high` is a judgment, not a measurement. To measure it, build one plan step twice from the same commit in two git worktrees, with `effort: xhigh` in one copy of the skill and `effort: high` in the other, and compare each run's round-1 HIGH and MED findings (each checked by hand), the same per 100 changed production lines, cost and rounds, using `measure_sessions.py`. Keep `high` only if `xhigh` finds at most 2 more real HIGH and MED findings and `high` costs at least 20% less; otherwise set `xhigh`.
-
-Measured cost on the previous model, before these settings: 15 build-task runs averaged $21.7, from $11.7 to $39.4. About two thirds of it was re-reading context, not new output: thinking stays in context and is paid for again on every call, so effort drives both. The size of the change drives the rest: keep each run within the size gate.
+Measured cost on the earlier pinned setup: 15 build-task runs averaged $21.7, from $11.7 to $39.4. About two thirds of it was re-reading context, not new output: thinking stays in context and is paid for again on every call, so effort drives both. The size of the change drives the rest: keep each run within the size gate.
 
 To measure your own runs: `python3 ~/.claude/shared/tools/measure_sessions.py --filter <repo-name>`. It prints cost, lines added, effort, model, calls that ran outside the skill, peak context, each reviewer's model, effort and foreground or background shape, the round records and the fix-plan check lines.
 
@@ -194,7 +186,7 @@ rm -r hooks/guardrails
 | --- | --- | --- |
 | `PreToolUse:Bash hook error: guardrails: guard_bash.py not found in <folder>` on every call | the folder you chose for guardrails was moved or deleted | in a terminal: `python3 ~/.claude/shared/guardrails/configure.py --dir "<folder>"`, or `--off` |
 | a call denied with `[guardrail:<rule>]` | a guardrail did its job | run the command yourself if you really mean it |
-| permission prompts, or your default model, after build-task's reviewers report | fork mode is on, so the reviewers ran in the background | set `CLAUDE_CODE_FORK_SUBAGENT=0` (Recommended settings); `measure_sessions.py` shows `background` per reviewer |
+| permission prompts after build-task's reviewers report | fork mode is on, so the reviewers ran in the background | set `CLAUDE_CODE_FORK_SUBAGENT=0` (Recommended settings); `measure_sessions.py` shows `background` per reviewer |
 | "This session started outside <repo>" | Claude Code was started in a parent folder | start it in the repository root, so its `CLAUDE.md`, settings and memory load |
 | a project's copy of a skill doesn't run | a personal skill of the same name in `~/.claude/skills` wins | delete one of them; for agents it's the reverse: the project copy wins |
 | "can't find scenario-checklist.md / validation-loop.md" | `shared/` isn't next to `skills/` | copy `shared/` as in Install |

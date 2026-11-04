@@ -6,8 +6,7 @@ description: >
   failing-if-broken test per AC, requirements no AC covers, and changes
   no AC asks for. Pass TASK, ACs, confirmed answers, sources, BASE, the
   changed and new files, and the test and can-fail results.
-model: claude-sonnet-5-5
-effort: medium
+model: inherit
 tools: Read, Glob, Grep, Bash
 permissionMode: dontAsk
 hooks:

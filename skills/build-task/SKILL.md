@@ -2,8 +2,6 @@
 name: build-task
 description: Implement one task in an existing codebase end to end - recon, brief, tests first, implement, then validate with independent reviewers, fix and re-validate until clean. Never commits.
 argument-hint: "<task description | Task Brief>"
-model: claude-sonnet-5-5
-effort: high
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
 hooks:
   PreToolUse:
@@ -37,7 +35,7 @@ CONTEXT: No PRD or architecture doc is assumed. "Done" is defined by the task te
 CONSTRAINTS: This task only. No drive-by refactors or reformatting. No new dependencies unless the task cannot be done without one and the user approves it. No destructive git commands (reset --hard, checkout --, restore, clean, stash drop, force push). Never stage, commit, push or switch branches: every change stays uncommitted in the working tree for the user to review. Files that were already modified or untracked before you started are off-limits unless the task requires them; say so when it does.
 QUESTIONS: Ask only BLOCKING questions: ones the task, code and tests cannot answer, where a wrong guess would change an AC or a public contract. Ask them as the question round says, so the build continues in this turn. Every other open point becomes an assumption with your recommended default, listed in the report.
 GUARDRAILS: When guardrails are installed, hooks deny destructive git commands, force pushes and credentials in written files, and commits and new dependencies wait for a human click. The rules above apply either way. If a call is denied with [guardrail:...], do not retry it another way: record it in the report.
-ONE TURN: the whole build runs in this turn. Never use `run_in_background`, Monitor or a background agent: a notification arrives as a new turn, and from then on the build has lost this skill's model, effort, tool pre-approvals and hooks. Give a long command the maximum timeout, or split it.
+ONE TURN: the whole build runs in this turn. Never use `run_in_background`, Monitor or a background agent: a notification arrives as a new turn, and from then on the build has lost this skill's tool pre-approvals and hooks. Give a long command the maximum timeout, or split it.
 CONTEXT BUDGET: everything you read or print stays in context for the rest of the build and is paid for again on every call. Grep before you read. For a file over about 300 lines, Read with offset and limit around the hits. Never print a whole file through Bash. Run tests and checks as the validation loop's SHORT OUTPUT says. Use Edit for a change at one site; use a patch script only for many mechanical edits in one file.
 
 Live state (verify these render; if they appear as literal text, run the git commands yourself):

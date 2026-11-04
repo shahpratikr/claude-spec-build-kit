@@ -7,8 +7,7 @@ description: >
   code and the task text cannot answer. Never sees the planner's questions.
   Pass the task text, the recon digest, the document paths and the
   discovery-probes path.
-model: claude-sonnet-5-5
-effort: high
+model: inherit
 tools: Read, Glob, Grep, Bash
 permissionMode: dontAsk
 hooks:
