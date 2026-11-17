@@ -53,7 +53,7 @@ From the code (AS-BUILT), each item with file evidence:
 - configuration: flags, environment variables and config files, with defaults
 - decision records, if the repo keeps them
 
-From the plan, only its Design section: runtime and stack, directory structure, modules and what each depends on, data and state, interfaces, configuration, and each decision's reason and rejected options. Skip the brief, ACs, scenario coverage, blast radius, steps and handoff lines. Where the plan and the code disagree, the code wins; report the conflict.
+From the plan, only its Design section: runtime and stack, directory structure, modules and what each depends on, data and state, interfaces, and configuration, from its Rules and Choices tables. The plan holds no reasons or rejected options: take them from the code or the existing ARCHITECTURE.md, or ask. Skip the summary, ACs, steps and handoff lines. Where the plan and the code disagree, the code wins; report the conflict.
 
 ## Step 2 - Questions
 Ask only what the code and the plan cannot answer: a decision the plan leaves open (recommend a choice), the intent behind an unusual structure, which of two competing patterns is the target, what is deprecated. Ask them all as one question round and wait for the answers. With nothing open, print "No open questions" and continue.

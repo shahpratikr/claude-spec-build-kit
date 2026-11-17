@@ -20,7 +20,7 @@ Profile: deep when any trigger holds; light when none holds and the change is at
 | Profile | Planning | Build review | Extra agents |
 | --- | --- | --- | --- |
 | light | followup implement, or a single-step plan | size tier S, gap-hunter alone | none |
-| standard | plan-task | size tier by change size, as today | none beyond the reviewers |
+| standard | plan-task | S, M or L by change size | none beyond the reviewers |
 | deep | plan-task plus an independent question-prober and plan-auditor | ac-auditor also at size tier S | two more planning agent runs, one more reviewer run |
 
 After recon, print `Profile: <light | standard | deep> (<trigger or none>)` once, and carry it into the report's Spend line.

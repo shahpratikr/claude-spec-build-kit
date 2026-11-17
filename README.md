@@ -4,7 +4,7 @@ Claude Code skills and subagents for one-task-at-a-time engineering in an existi
 
 | Skill | Use it to | Writes files |
 | --- | --- | --- |
-| `/plan-task <task> [plan.md]` | plan a task or a new project: asks what the code can't answer, then writes acceptance criteria (ACs), design decisions and buildable steps | the plan file you name |
+| `/plan-task <task> [plan.md]` | plan a task or a new project: asks what the code can't answer, then writes a short plan: summary, design rules and choices, and one acceptance criteria (AC) table per buildable step | the plan file you name |
 | `/docs-prd [sources]` | create or update the project overview and context: purpose, users, scope, flow, constraints | `docs/PRD.md` |
 | `/docs-arch <plan.md>` | create or update the architecture from the code and the plan: repository structure, components, data, flows, interfaces, configuration | `docs/ARCHITECTURE.md` |
 | `/docs-claudemd <plan.md>` | create or refresh a lean, verified `CLAUDE.md` from the code, the plan and the two docs | `CLAUDE.md` |
@@ -25,7 +25,8 @@ The subagents are the read-only reviewers that build-task and followup spawn: `a
 
 **Task profile.** Each skill sizes the task and prints `Profile: light`, `standard` or `deep`, with the trigger that decided it. A task is `deep` when a public contract changes, stored data or a migration is involved, it is a new project, it changes security, permissions or identity, its blast radius reaches beyond the repository (cloud, tenant, production, a client environment), or recon finds more than about 10 files. A deep profile adds an independent `question-prober` and `plan-auditor` to `/plan-task` and a `ac-auditor` to small builds; `light` runs no agent beyond `gap-hunter`. Start the arguments with the word `light` or `deep` to override the choice. `shared/task-profile.md` has the rules.
 
-Start Claude Code in the repository root. Claude Code loads `CLAUDE.md`, project settings and memory from the session folder, and the hooks treat that folder as the project. build-task and followup warn when the session started outside the repository, then continue with `git -C`.
+Start Claude Code in the repository root when you can: Claude Code loads `CLAUDE.md`, project settings and memory from the session folder, and the hooks treat that folder as the project.
+A session started elsewhere still works. build-task and followup implement find the repository from the plan file or the first path the task names (the current folder when it names none), read its `CLAUDE.md` first, and run every git command as `git -C <repo>`.
 
 ## Requirements
 
@@ -104,10 +105,19 @@ Optional, and recommended for a user-level install: to guard sessions that never
 ## Using the skills
 
 **Plan and project docs.** Each skill writes one file, and the files never repeat each other:
-- `/plan-task` writes the plan, at the path you name: ACs, design decisions, steps and `/build-task` lines. If you don't name a path, it asks.
+- `/plan-task` writes the plan, at the path you name: a summary, design rules and choices, one AC table per step and the `/build-task` lines. If you don't name a path, it asks.
 - `/docs-prd` writes `docs/PRD.md`: what the project is, for whom and why. It has no directory structure, design or plan.
 - `/docs-arch <plan.md>` writes `docs/ARCHITECTURE.md` from the code and the plan's design decisions.
 - `/docs-claudemd <plan.md>` writes `CLAUDE.md` from the code, the plan and the two docs: the commands, test rules, conventions, invariants and constraints the other skills read.
+
+**The plan format.** A plan is meant to be read line by line, so it is short: at most 120 lines for a light or standard task, 250 for a deep one, and 40 + 12 per step for a new project. It has four sections:
+- `## Summary`: goal, why, a step table and the out-of-scope list, in at most 25 lines;
+- `## Design`: `Rules every step keeps` (R1, R2, ... with what enforces each) and `Choices` (Area, Choice). docs-arch and docs-claudemd read only this section;
+- `## Steps`: per step its files, the R-ids it keeps and a table with one AC per row, each AC in exactly one step;
+- `## Handoff`: the `/build-task` lines, each with the step's ACs and `- Rules: R1`.
+Tables have their pipes aligned and rows of at most 100 characters. `shared/tools/align_md_tables.py <plan.md>` pads the tables and lists rows that are too wide; plan-task runs it, and it is the only shell command plan-task may run.
+Everything else plan-task learns (probe answers, pre-mortem, assumptions, scenario coverage, value-by-event tables) goes to `plan-notes.md` in the scratchpad. The chat prints a count block and that path, plus false premises and HIGH risks. Confirmed answers land in an AC, a rule or a Design row, and the chat lists where each landed. Reasons for design choices stay in the chat too.
+Plans written before this format (with `## Brief`) still build: build-task reads their Brief, Design, Blast radius and step row.
 
 For a new project, run them in that order. Each one updates its own file in place on later runs. The docs take decisions from the plan, never its ACs, steps or `/build-task` lines, and never mention the plan, because a plan goes stale when its task ends. `shared/project-docs.md` decides which file owns which fact.
 
@@ -117,9 +127,9 @@ A typical task:
 
 1. `/docs-claudemd` once, if the repository has no `CLAUDE.md`. build-task reads the test command from it.
 2. `/plan-task <task> <plan.md>` asks every question the code can't answer, writes the plan file, and prints a ready-to-paste `/build-task ...` line, or one `/build-task Step N of M ...` line per step for a bigger change. The handoff lines carry the plan path, and build-task reads the plan: its Brief with your confirmed answers, its Design and its Blast radius. On a deep task an independent `plan-auditor` reviews the written plan before you see the handoff lines.
-3. Paste the `/build-task` line. It runs to the end without approvals and stops only for questions it can't settle from the code. A task of more than about 10 production files stops at a question first and offers a `/plan-task` line to split it: every review round re-reads the whole change, so a 100-file run takes hours.
+3. Paste the `/build-task` line. It reads the plan by section (Summary, Design and its step), runs to the end without approvals and stops only for questions it can't settle from the code. A task of more than about 10 production files stops at a question first and offers a `/plan-task` line to split it: every review round re-reads the whole change, so a 100-file run takes hours.
 4. Review the change and commit it yourself. For multi-step plans, commit each step before starting the next.
-5. `/followup` for anything that comes up mid-session. `implement:` changes go through the same review loop as build-task. It edits files without asking, but its Bash is limited to git commands, so Claude Code asks before it runs your test command or the can-fail script.
+5. `/followup` for anything that comes up mid-session. `implement:` runs the same build flow as build-task (`shared/build-steps.md`), after its question round: baseline, tests first, review loop, the same report and commit message. It has no approval stop of its own: a contract change the answers leave open is a blocking question. It edits files without asking, but its Bash is limited to git commands, so Claude Code asks before it runs your test command or the can-fail script.
 
 **Questions.** Every skill asks through Claude Code's question picker: up to 4 questions per dialog, blocking ones first, with the recommended answer listed first. Choose "Other" to type your own answer. Keep-or-cut lists arrive as checkboxes, and a question that depends on another answer waits for the next dialog. Only open input with no likely answers, such as the task itself, is asked in plain text. Answers carry across skills in the same session, so nothing is asked twice. Where the picker isn't available, such as in `claude -p`, the skill prints the questions as text and waits for a reply like `defaults` or `defaults except Q3=B`.
 
@@ -134,14 +144,15 @@ A typical task:
    - `gap-hunter`: every untested scenario, defect and contradiction, with no cap on findings. It proves suspected defects with small probe scripts in the scratchpad;
    - `convention-checker`: project conventions and invariants, each violation marked BLOCKING or MINOR.
    Reviewers see the task, your confirmed answers, the diff and the test and can-fail results, never the builder's reasoning, variant table or fix plans. They never re-run the suite.
-   Before any fix, build-task writes a fix plan: one entry per MUST-FIX finding, with the root cause, every sibling location, the variants, the callers at risk, the failing tests and a pre-mortem. It checks the plan against the code, corrects what is missing, malformed or wrong, prints a `fix-plan check` line, and only then edits.
+   Before any fix, build-task prints `fix plan r<n> start` and writes a fix plan with one entry per MUST-FIX finding. A FULL entry (a HIGH or MED finding whose fix changes production logic, a public contract or a shared helper) has the root cause, every sibling location, the variants, the callers at risk, the failing tests and a pre-mortem.
+   Every other finding gets a LIGHT entry: one line with the root cause, the sibling search and its hits, and the test or doc-only change. The plan is checked against the code, corrected where it is missing, malformed or wrong, and a `fix-plan check` line with `full f / light l` is printed before any edit.
    Round 2 re-checks. build-task confirms each fix with evidence (a passing test, a clean search), then spawns `fix-verifier` on what the fixes changed. It adds the other two reviewers only when an AC changed, a file was created, or a fix couldn't be confirmed. Round 3 runs only when round 2 found a HIGH, overturned a confirmation, or left a production fix it can't prove with a test and killed breaks. After the last review, no production code changes, so nothing reaches you unreviewed.
 6. Prints a report with these parts:
    - the verdict, `PASS` or `NEEDS REVIEW`;
    - the AC-to-test map and test results;
    - each validation round;
    - anything that needs your decision;
-   - `git diff <BASE>` to review the change, a one-line undo command, and a suggested commit message.
+   - `git diff <BASE>` to review the change, a one-line undo command, and a suggested commit message: an imperative title of at most 72 characters and one short paragraph saying what the change does. It never lists ACs, tests, baseline counts or files, and a test-only or one-line change gets the title alone.
    It never stages, commits, pushes or switches branches.
 
 ### Models, effort and cost
@@ -159,6 +170,7 @@ What this changes from the earlier pinned setup (Sonnet everywhere; gap-hunter a
 Measured cost on the earlier pinned setup: 15 build-task runs averaged $21.7, from $11.7 to $39.4. About two thirds of it was re-reading context, not new output: thinking stays in context and is paid for again on every call, so effort drives both. The size of the change drives the rest: keep each run within the size gate.
 
 To measure your own runs: `python3 ~/.claude/shared/tools/measure_sessions.py --filter <repo-name>`. It prints cost, lines added, effort, model, calls that ran outside the skill, peak context, each reviewer's model, effort and foreground or background shape, the round records and the fix-plan check lines.
+It also prints the active minutes (gaps over 15 minutes count as idle), the time before the first review, the time reviewers took and the time each fix plan took, from the `fix plan r<n> start` marker.
 
 ## Updating
 
@@ -176,7 +188,7 @@ A `CLAUDE.md` written by an older docs-claudemd `@`-imports the PRD and ARCHITEC
 cd ~/.claude
 rm -r skills/{build-task,followup,docs-arch,docs-claudemd,plan-task,docs-prd}
 rm agents/{convention-checker,ac-auditor,gap-hunter,fix-verifier,plan-auditor,question-prober}.md
-rm -r shared/guardrails shared/tools shared/guardrails-setup.md shared/project-docs.md shared/question-round.md shared/scenario-checklist.md shared/validation-loop.md shared/discovery-probes.md shared/verification-profiles.md shared/task-profile.md
+rm -r shared/guardrails shared/tools shared/build-steps.md shared/guardrails-setup.md shared/project-docs.md shared/question-round.md shared/scenario-checklist.md shared/validation-loop.md shared/discovery-probes.md shared/verification-profiles.md shared/task-profile.md
 rm -r hooks/guardrails
 ```
 
@@ -187,7 +199,7 @@ rm -r hooks/guardrails
 | `PreToolUse:Bash hook error: guardrails: guard_bash.py not found in <folder>` on every call | the folder you chose for guardrails was moved or deleted | in a terminal: `python3 ~/.claude/shared/guardrails/configure.py --dir "<folder>"`, or `--off` |
 | a call denied with `[guardrail:<rule>]` | a guardrail did its job | run the command yourself if you really mean it |
 | permission prompts after build-task's reviewers report | fork mode is on, so the reviewers ran in the background | set `CLAUDE_CODE_FORK_SUBAGENT=0` (Recommended settings); `measure_sessions.py` shows `background` per reviewer |
-| "This session started outside <repo>" | Claude Code was started in a parent folder | start it in the repository root, so its `CLAUDE.md`, settings and memory load |
+| `CLAUDE.md` rules ignored when Claude Code starts in a parent folder | Claude Code loads `CLAUDE.md` from the session folder only; the skills read the repository's own copy, but its settings and memory don't load | start it in the repository root |
 | a project's copy of a skill doesn't run | a personal skill of the same name in `~/.claude/skills` wins | delete one of them; for agents it's the reverse: the project copy wins |
 | "can't find scenario-checklist.md / validation-loop.md" | `shared/` isn't next to `skills/` | copy `shared/` as in Install |
 | a reviewer or helper agent can write files | an old agent file with `allowedTools:`, a field Claude Code silently ignores | re-copy `agents/`; the field is `tools:` |
@@ -200,16 +212,18 @@ To see the guardrails' denials and questions, read `guardrail-hooks.jsonl` in th
 | --- | --- |
 | `skills/<name>/SKILL.md` | the six skills |
 | `agents/*.md` | the reviewers, the question-prober and the plan-auditor; none has write tools or changes the repository. gap-hunter's and fix-verifier's probe scripts go in the scratchpad |
-| `shared/scenario-checklist.md` | test-scenario categories used by build-task, followup, the reviewers and plan-task |
+| `shared/build-steps.md` | the one build flow (repo lookup, recon, brief, tests first, implement, verify, validate, report) that build-task and followup implement both run |
+| `shared/scenario-checklist.md` | test-scenario categories used by plan-task, build-task, followup, gap-hunter and fix-verifier |
 | `shared/validation-loop.md` | the can-fail pass and the review, fix and re-review procedure used by build-task and followup |
-| `shared/project-docs.md` | which of the plan file, `PRD.md`, `ARCHITECTURE.md` and `CLAUDE.md` owns each kind of fact, used by the plan-task and docs skills |
+| `shared/project-docs.md` | which of the plan file, `PRD.md`, `ARCHITECTURE.md` and `CLAUDE.md` owns each kind of fact, used by the docs skills |
 | `shared/question-round.md` | how every skill asks questions: the picker, the recommended-first order and the text fallback |
 | `shared/task-profile.md` | the lanes, the triggers and the light, standard and deep profiles every skill prints after recon |
 | `shared/verification-profiles.md` | how to verify a task that has no unit tests (infrastructure, scripts, configuration, docs): the checks per file type and the rules for a validation command |
 | `shared/discovery-probes.md` | the eleven categories of mandatory probes plan-task answers before it plans, and the extras by task type |
 | `shared/guardrails-setup.md` | the first-run guardrails questions |
 | `shared/guardrails/` | the hook scripts (`guard_bash.py`, `guard_write.py`, `guard_prompt.py`), `selftest.py`, `configure.py` (installs them and points the skills at them), and `settings.example.json` |
-| `shared/tools/measure_sessions.py` | measures runs from Claude Code's transcripts: cost, effort, skill escapes, context, reviewers, rounds |
+| `shared/tools/measure_sessions.py` | measures runs from Claude Code's transcripts: cost, effort, skill escapes, context, reviewers, rounds, phase timings |
+| `shared/tools/align_md_tables.py` | pads Markdown tables so the pipes line up and lists rows over 100 columns; plan-task runs it on the plan file |
 
 ## Contributing
 

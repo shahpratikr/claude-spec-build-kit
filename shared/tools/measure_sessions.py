@@ -1,9 +1,10 @@
-"""Measure Claude Code sessions that ran these skills: cost, effort, skill escapes, context, reviewers, rounds.
+"""Measure Claude Code sessions that ran these skills: cost, effort, skill escapes, context, reviewers, rounds, phase timings.
 
 Reads the transcripts Claude Code writes under ~/.claude/projects/<project>/<session>.jsonl and their
 subagents/ folders. Usage: python3 measure_sessions.py [--filter TEXT] [--since YYYY-MM-DD] [SESSION_PREFIX ...]
 """
 import argparse
+import bisect
 import collections
 import json
 import re
@@ -16,6 +17,10 @@ RECORD = re.compile(r"^\s*-?\s*(R[123]):\s*(.*)$", re.M)
 FIX_PLAN = re.compile(r"fix-plan check r\d+:[^\n]*")
 VERDICT = re.compile(r"Verdict:\s*(PASS|NEEDS REVIEW)[^\n]*")
 ORIGIN = re.compile(r"Origin counts:\s*FIX\s*(\d+),\s*MISSED\s*(\d+)")
+FIX_PLAN_START = re.compile(r"fix plan r(\d+) start")
+FIX_PLAN_END = re.compile(r"fix-plan check r(\d+):")
+REVIEWERS = {"ac-auditor", "gap-hunter", "convention-checker", "fix-verifier"}
+IDLE_SECONDS = 15 * 60
 
 
 def entries(path):
@@ -77,6 +82,86 @@ def subagents(session_dir):
     return rows
 
 
+def parse_time(value):
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+    except (AttributeError, ValueError):
+        return None
+
+
+class Clock:
+    """Active time between two instants: every gap between transcript entries over 15 minutes counts as idle."""
+
+    def __init__(self, stamps):
+        self.stamps = sorted(stamps)
+        self.cumulative = [0.0]
+        for a, b in zip(self.stamps, self.stamps[1:]):
+            self.cumulative.append(self.cumulative[-1] + (b - a if b - a <= IDLE_SECONDS else 0))
+
+    def between(self, t0, t1):
+        i = bisect.bisect_left(self.stamps, t0)
+        j = bisect.bisect_right(self.stamps, t1) - 1
+        return max(0.0, self.cumulative[j] - self.cumulative[i]) if self.stamps and 0 <= i <= j < len(self.stamps) else 0.0
+
+
+def phases(path):
+    """Active minutes, time before the first review, reviewer wall time per round, the gap between rounds and each fix plan."""
+    stamps, started, ended, spawned = [], {}, {}, {}
+    markers = {"start": {}, "end": {}}
+    for d in entries(path):
+        t = parse_time(d.get("timestamp"))
+        if t is None:
+            continue
+        stamps.append(t)
+        content = d.get("message", {}).get("content") if isinstance(d.get("message"), dict) else None
+        for c in content if isinstance(content, list) else []:
+            if not isinstance(c, dict):
+                continue
+            if c.get("type") == "tool_use" and c.get("name") in ("Agent", "Task"):
+                kind = (c.get("input") or {}).get("subagent_type")
+                if kind in REVIEWERS:
+                    started[c["id"]], spawned[c["id"]] = t, kind
+            elif c.get("type") == "tool_result" and c.get("tool_use_id") in started:
+                ended[c["tool_use_id"]] = t
+            elif c.get("type") == "text" and d.get("type") == "assistant":
+                for pattern, key in ((FIX_PLAN_START, "start"), (FIX_PLAN_END, "end")):
+                    for n in pattern.findall(c.get("text", "")):
+                        markers[key].setdefault(int(n), t)
+    if not stamps:
+        return None
+    clock = Clock(stamps)
+    runs = sorted((started[i], ended.get(i, started[i])) for i in started)
+    rounds = []
+    for t0, t1 in runs:
+        if rounds and t0 <= rounds[-1][1]:
+            rounds[-1][1] = max(rounds[-1][1], t1)
+        else:
+            rounds.append([t0, t1])
+    return {
+        "active": clock.between(stamps[0], stamps[-1]) / 60,
+        "before_review": clock.between(stamps[0], rounds[0][0]) / 60 if rounds else None,
+        "rounds": [clock.between(a, b) / 60 for a, b in rounds],
+        "gaps": [clock.between(rounds[k][1], rounds[k + 1][0]) / 60 for k in range(len(rounds) - 1)],
+        "fix_plans": {n: clock.between(markers["start"][n], markers["end"][n]) / 60
+                      for n in sorted(markers["start"]) if n in markers["end"] and markers["end"][n] >= markers["start"][n]},
+    }
+
+
+def phase_line(ph):
+    if not ph:
+        return None
+    parts = [f"active {ph['active']:.0f}m"]
+    if ph["before_review"] is not None:
+        parts.append(f"before review {ph['before_review']:.0f}m")
+    if ph["rounds"]:
+        parts.append(f"reviewers {sum(ph['rounds']):.0f}m (" + ", ".join(f"R{i} {m:.0f}m" for i, m in enumerate(ph["rounds"], 1)) + ")")
+    if ph["gaps"]:
+        parts.append("review gaps " + ", ".join(f"R{i}->R{i + 1} {m:.0f}m" for i, m in enumerate(ph["gaps"], 1)))
+    if ph["fix_plans"]:
+        parts.append("fix plan " + ", ".join(f"r{n} {m:.0f}m" for n, m in ph["fix_plans"].items()))
+    return "time: " + ", ".join(parts) + " (gaps over 15 min counted as idle)"
+
+
 def measure(path):
     cost_state, skill_started, texts_all = None, False, []
     read_ids, read_sizes = set(), []
@@ -117,6 +202,7 @@ def measure(path):
         "fix_plans": FIX_PLAN.findall(joined)[-3:],
         "verdict": (VERDICT.findall(joined) or [None])[-1],
         "subagents": subagents(path.with_suffix("")),
+        "phases": phases(path),
         "start": next((d.get("timestamp") for d in main), ""),
     }
 
@@ -149,6 +235,8 @@ def main(argv=None):
         for s in m["subagents"]:
             print(f"  agent {s['type']:<18} {s['shape']:<10} {','.join(filter(None, s['models']))} effort {','.join(s['efforts'])}"
                   f" calls {s['calls']} out {s['out'] // 1000}k" + (f" origin FIX {s['origin'][0]} MISSED {s['origin'][1]}" if s["origin"] else ""))
+        if phase_line(m["phases"]):
+            print(f"  {phase_line(m['phases'])}")
         for line in m["records"] + m["fix_plans"]:
             print(f"  {line}")
         if m["verdict"]:

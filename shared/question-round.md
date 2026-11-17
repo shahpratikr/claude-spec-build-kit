@@ -20,6 +20,7 @@ Shape each question to fit the picker:
 Before a round of two or more questions, print as text:
 - "Resolved from code (challenge me if wrong)": item -> file:line and the quoted line
 - "Dropped questions" and the "Assumption register", when the skill keeps them (plan-task): each dropped question with its one-line reason, each assumption verified from code or asked
+- A skill that keeps a notes file (plan-task) prints the counts and the notes path for these lists, not the lists. Only false premises and HIGH risks are printed in full.
 - "Recommended path": 2-4 lines on what happens if the user accepts every recommendation
 - one count line, for example "11 questions: 5 blocking, 6 non-blocking, in 3 dialogs"
 

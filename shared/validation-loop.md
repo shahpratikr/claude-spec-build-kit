@@ -40,16 +40,21 @@ When the project has no tests, the pass is N/A with that reason: a validation co
 Do not run it again in the same round, or after the last round unless code changed since.
 
 ## Fix plan (every fix round, before any edit)
+0. Print `fix plan r<n> start` before anything else, so the run can time the fix plan.
 1. Snapshot the change set first, so the next round can see what the fixes changed. PREV is a new folder `prev-r<n>` in your scratchpad directory, where reviewers can read: `mkdir -p "$PREV" && tar cf - <every existing file in the file lists> | tar xf - -C "$PREV"`.
-2. Write `fix-plan-r<n>.md` in the scratchpad, one entry per MUST-FIX ledger item:
+2. Write `fix-plan-r<n>.md` in the scratchpad, one entry per MUST-FIX ledger item. Each entry is FULL or LIGHT:
+   - FULL: a HIGH or MED item whose fix changes production logic, a public contract or a shared helper. It has the six parts below.
+   - LIGHT: everything else (LOW items, test-only, docs or comments, convention fixes). It is one line: `root cause | sibling search + hits | test or doc-only`.
+   - A LIGHT entry that turns out to touch production logic becomes FULL before the edit goes on.
+   The six parts of a FULL entry:
    1. Root cause, in one line: the cause, not the reported instance.
    2. Siblings: the search commands run, and every hit marked fix or not-applicable, with a reason.
    3. Variants: the variant-table rows the fix must handle. The reviewer's example is one instance.
    4. Blast radius: the callers and dependents of the lines to change, and what each could break. Watch removed or added early returns, changed error types, and widened or narrowed conditions.
    5. Tests: one failing test per variant, each able to fail when the scenario is absent.
    6. Pre-mortem: the most likely way this fix is wrong, and the check that rules it out.
-3. Verify the plan against the repository, not from memory. Check every entry:
-   1. Complete: every MUST-FIX ledger item has an entry, and every entry has all six parts. A vague part ("fix similar places", "add tests") counts as missing.
+3. Verify the plan against the repository, not from memory. A FULL entry gets all eight checks below. A LIGHT entry gets two: check 2 (re-open the location) and check 3 (re-run the sibling search).
+   1. Complete: every MUST-FIX ledger item has an entry, and every FULL entry has all six parts. A vague part ("fix similar places", "add tests") counts as missing.
    2. Locations: re-open every cited file:line. It exists and says what the entry claims.
    3. Siblings: re-run each search. The hits match the list and every hit is classified. Derive the search terms from the root cause, not the reviewer's wording, and add the pattern's other spellings. A new hit joins the entry.
    4. Variants: every variant-table row for the input surface the fix touches is in the entry or N/A with a reason. The reviewer's example is one of them.
@@ -58,7 +63,7 @@ Do not run it again in the same round, or after the last round unless code chang
    7. Root cause: the fix changes the cause, so it also closes every sibling. A fix that handles only the reported instance is incorrect.
    8. Consistency: no two entries conflict; entries that touch the same lines are merged; no entry contradicts an AC or a confirmed answer. An entry that changes a public contract or widens scope becomes NEEDS DECISION.
 4. Correct the plan. An entry with a part missing, malformed (wrong format, or parts that do not fit together) or incorrect (wrong line, stale search, missed caller, a test that cannot fail) is fixed in `fix-plan-r<n>.md`. Then run all eight checks again on the entries that changed, at most 3 passes. An entry that still fails is not applied: the ledger marks it open with the failing check, or NEEDS DECISION when the failure is a scope question.
-5. Print one line: `fix-plan check r<n>: <entries> entries, <c> corrected (missing <a>, malformed <b>, incorrect <d>), <h> held back, <p> passes`. No edit of this round starts before this line.
+5. Print one line: `fix-plan check r<n>: <entries> entries, full <f> / light <l>, <c> corrected (missing <a>, malformed <b>, incorrect <d>), <h> held back, <p> passes`. No edit of this round starts before this line.
 6. Apply the plan, entry by entry, the way the calling skill builds: the failing tests first, then the smallest change, then the narrowest tests. Never fix pre-existing failures. A plan problem found while editing (an unexpected caller, a hit the plan missed, a test that passes before the fix) stops that entry: correct it, run the eight checks on it, then continue.
 7. Update the ledger: fixed at file:line, or open with the reason. Your own copy also names each item's plan entry. The copy that goes into a reviewer brief carries no plan entry and no plan path (RULE).
 
@@ -115,5 +120,5 @@ LOW and OPTIONAL findings never trigger a round.
 PASS = every AC YES, no TASK requirement uncovered, no HIGH or MED gap left inside the scope, no BLOCKING violation, no new failure, and nothing critical NOT RUN. Open NEEDS DECISION items don't block PASS, but they are always listed. Anything else is NEEDS REVIEW, with the open items listed.
 
 ## Record (one line per round, for the report)
-`R<n>: tier [S|M|L], tests [pass/fail], can-fail [killed/survived open], reviewers [run | skipped: reason], ACs [YES/PARTIAL/NO counts], gaps [H/M/L], origin [FIX n / MISSED n] (round 2+), auditor YES overturned [n] (round 2+), conventions [blocking/minor] -> fix-plan check [entries / corrected / held back], fixed [...], confirmed [...], dismissed [...], open [...]`
+`R<n>: tier [S|M|L], tests [pass/fail], can-fail [killed/survived open], reviewers [run | skipped: reason], ACs [YES/PARTIAL/NO counts], gaps [H/M/L], origin [FIX n / MISSED n] (round 2+), auditor YES overturned [n] (round 2+), conventions [blocking/minor] -> fix-plan check [entries, full f / light l / corrected / held back], fixed [...], confirmed [...], dismissed [...], open [...]`
 `R3: skipped: <reason>` when round 3 does not run.

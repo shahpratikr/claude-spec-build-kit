@@ -1,6 +1,6 @@
 # Scenario Coverage Checklist
 
-Used for test planning (build), gap hunting (the validation loop), and question generation (interview).
+Used by plan-task, build-task and followup implement for scenario coverage and test planning, and by the gap-hunter and fix-verifier reviewers for gap hunting.
 
 RULE: every category below must end as APPLICABLE (concrete scenarios, each mapped to a named test)
 or N/A (an N/A names the grep or file that proves it, e.g. "no logging touched: grep `logger` over the changed files returns 0 hits"; "not relevant" is not a reason).
