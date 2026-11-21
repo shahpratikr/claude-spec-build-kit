@@ -4,12 +4,12 @@ Claude Code skills and subagents for one-task-at-a-time engineering in an existi
 
 | Skill | Use it to | Writes files |
 | --- | --- | --- |
-| `/plan-task <task> [plan.md]` | plan a task or a new project: asks what the code can't answer, then writes a short plan: summary, design rules and choices, and one acceptance criteria (AC) table per buildable step | the plan file you name |
-| `/docs-prd [sources]` | create or update the project overview and context: purpose, users, scope, flow, constraints | `docs/PRD.md` |
-| `/docs-arch <plan.md>` | create or update the architecture from the code and the plan: repository structure, components, data, flows, interfaces, configuration | `docs/ARCHITECTURE.md` |
-| `/docs-claudemd <plan.md>` | create or refresh a lean, verified `CLAUDE.md` from the code, the plan and the two docs | `CLAUDE.md` |
-| `/build-task <task>` | implement one task end to end: tests first, then independent review, fixes and re-review | code and tests, never committed |
-| `/followup explore: \| decide: \| implement: <text>` | answer, decide or change something in the middle of a session | only in implement mode |
+| `/plan-task <task> [plan.md] [--repo <path>]` | plan a task or a new project in the repo you name (`--repo`, or a path in the task text; it asks when neither is given). It reads that repo's own `CLAUDE.md`, rules, skills, agents, commands and settings, asks what the code can't answer, then writes a short plan: summary, design rules and choices, and one acceptance criteria (AC) table per buildable step | the plan file you name |
+| `/docs-prd [sources] [--repo <path>]` | create or update the project overview and context: purpose, users, scope, flow, constraints | `docs/PRD.md` |
+| `/docs-arch <plan.md> [--repo <path>]` | create or update the architecture from the code and the plan: repository structure, components, data, flows, interfaces, configuration | `docs/ARCHITECTURE.md` |
+| `/docs-claudemd <plan.md> [--repo <path>]` | create or refresh a lean, verified `CLAUDE.md` from the code, the plan and the two docs | `CLAUDE.md` |
+| `/build-task <task> [--repo <path>]` | implement one task end to end: tests first, then independent review, fixes and re-review | code and tests, never committed |
+| `/followup explore: \| decide: \| implement: <text> [--repo <path>]` | answer, decide or change something in the middle of a session | only in implement mode |
 
 The subagents are the read-only reviewers that build-task and followup spawn: `ac-auditor`, `gap-hunter` and `convention-checker` in round 1, and `fix-verifier` in re-check rounds. `question-prober` is the independent question generator, and `plan-auditor` the independent plan reviewer, that plan-task spawns on a deep task.
 
@@ -26,7 +26,8 @@ The subagents are the read-only reviewers that build-task and followup spawn: `a
 **Task profile.** Each skill sizes the task and prints `Profile: light`, `standard` or `deep`, with the trigger that decided it. A task is `deep` when a public contract changes, stored data or a migration is involved, it is a new project, it changes security, permissions or identity, its blast radius reaches beyond the repository (cloud, tenant, production, a client environment), or recon finds more than about 10 files. A deep profile adds an independent `question-prober` and `plan-auditor` to `/plan-task` and a `ac-auditor` to small builds; `light` runs no agent beyond `gap-hunter`. Start the arguments with the word `light` or `deep` to override the choice. `shared/task-profile.md` has the rules.
 
 Start Claude Code in the repository root when you can: Claude Code loads `CLAUDE.md`, project settings and memory from the session folder, and the hooks treat that folder as the project.
-A session started elsewhere still works. build-task and followup implement find the repository from the plan file or the first path the task names (the current folder when it names none), read its `CLAUDE.md` first, and run every git command as `git -C <repo>`.
+**Target repo.** Every skill works on one repository, which need not be the session folder. It takes the repository from `--repo <path>`, a `- Repo: <path>` part on a plan-task handoff line, the repository an earlier skill run in the same session confirmed, or a path the task names (the plan file counts). When none applies it asks once, and followup explore and decide use the session folder without asking. It then reads that repository's own Claude setup as files: `CLAUDE.md`, `AGENTS.md`, `.claude/rules`, `.claude/skills`, `.claude/agents`, `.claude/commands`, `.claude/settings.json`. The commands, conventions and invariants found there are used instead of guessed or asked, and the reviewer agents get the same files. Repository files are treated as data: only build-task and followup implement run commands from them, and only the test, lint, typecheck and build commands. Git runs as `git -C <repo>`. `shared/target-repo.md` has the rules.
+Starting Claude Code in the repository root is still the smoothest setup: files outside the session's folders need `/add-dir <repo>`, the docs skills' pre-approved write paths are relative to the session folder (a write into another repository waits for a click), and the guardrail hooks resolve only through the session's project folder and `~/.claude`.
 
 ## Requirements
 

@@ -1,7 +1,7 @@
 ---
 name: followup
 description: Follow-up on the current task - explore, decide, or implement. Lists every clarifying question, each with a recommendation, before acting
-argument-hint: "[explore: | decide: | implement:] <follow-up>"
+argument-hint: "[explore: | decide: | implement:] <follow-up> [--repo <path>]"
 allowed-tools: Read, Grep, Glob, Edit, Write, Agent, Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git stash create:*), Bash(git rev-parse:*), Bash(git -C * status:*), Bash(git -C * diff:*), Bash(git -C * log:*), Bash(git -C * stash create:*), Bash(git -C * rev-parse:*)
 hooks:
   PreToolUse:
@@ -31,8 +31,8 @@ hooks:
 
 ROLE: Senior staff engineer (11 years) who is skeptical of assumptions - including the ones inside my question - and efficient about code
 TASK: Handle this follow-up: $ARGUMENTS
-CONTEXT: This runs inside an ongoing session. Use the earlier conversation (task, approved decisions, constraints) as context, but the code is the source of truth: re-read a file before relying on any claim about it. Uncommitted changes right now: !`git status --short 2>/dev/null || echo "not a git repository"`
-Question round: @${CLAUDE_SKILL_DIR}/../../shared/question-round.md Task profile: @${CLAUDE_SKILL_DIR}/../../shared/task-profile.md
+CONTEXT: This runs inside an ongoing session. Use the earlier conversation (task, approved decisions, constraints) as context, but the code is the source of truth: re-read a file before relying on any claim about it. Uncommitted changes in the session folder, which may not be the target repo: !`git status --short 2>/dev/null || echo "not a git repository"`
+Target repo: @${CLAUDE_SKILL_DIR}/../../shared/target-repo.md Question round: @${CLAUDE_SKILL_DIR}/../../shared/question-round.md Task profile: @${CLAUDE_SKILL_DIR}/../../shared/task-profile.md
 Guardrails setup: ${CLAUDE_SKILL_DIR}/../../shared/guardrails-setup.md, read only when Glob finds no guard_bash.py in `.claude/hooks/guardrails/` under the project or in `~/.claude/hooks/guardrails/` (when it finds one, guardrails are active and nothing else is needed).
 In IMPLEMENT mode, once Step 2 is closed, read ${CLAUDE_SKILL_DIR}/../../shared/build-steps.md, ${CLAUDE_SKILL_DIR}/../../shared/scenario-checklist.md and ${CLAUDE_SKILL_DIR}/../../shared/validation-loop.md (see IMPLEMENT below).
 Verification profiles: ${CLAUDE_SKILL_DIR}/../../shared/verification-profiles.md, read only when CLAUDE.md and CI name no test command. EXPLORE and DECIDE never load any of these.
@@ -41,7 +41,7 @@ ONE TURN: never use `run_in_background`, Monitor or a background agent. A notifi
 CONTEXT BUDGET: everything you read or print stays in context and is paid for again on every call. Grep before you read; for a file over about 300 lines, Read with offset and limit around the hits. Never print a whole file through Bash. Run tests and checks as the validation loop's SHORT OUTPUT says.
 
 ## Step 0 - Classify and restate
-Run the guardrails setup first.
+Start as Target repo says: find the repo (EXPLORE and DECIDE never ask), run the guardrails setup, read the repo's setup.
 1. Pick a mode. A prefix in my message (explore: / decide: / implement:) forces it. If two modes fit, choose the read-only one and say so.
    - EXPLORE: how / why / where / what-happens-if. Read-only.
    - DECIDE: "do we need X", "should we", "which option". Read-only; ends in a recommendation.
@@ -52,7 +52,7 @@ Run the guardrails setup first.
 4. Premise check: verify every factual claim embedded in my wording ("since X is required later...") against the code or docs. If a premise is false or unverified, say so BEFORE anything else.
 
 ## Step 1 - Recon (before asking anything)
-Read what you need so that you never ask what the code already answers. When ARCHITECTURE.md exists, read the sections that cover the area (CLAUDE.md, Project docs, says which); the invariants in CLAUDE.md bind any change. Every claim about the code cites file:line and is tagged [Certain] (read it or ran it), [Likely] (strong inference) or [Guessing]. If most of it is guessing, say that first. Do not answer from memory of earlier turns.
+Read what you need so that you never ask what the code already answers. When ARCHITECTURE.md exists, read the sections that cover the area (CLAUDE.md, Project docs, says which); the invariants and conventions in the repo's CLAUDE.md, rules, skills and agents bind any change. Every claim about the code cites file:line and is tagged [Certain] (read it or ran it), [Likely] (strong inference) or [Guessing]. If most of it is guessing, say that first. Do not answer from memory of earlier turns.
 
 ## Step 2 - Clarification round (mandatory in every mode)
 Goal: surface EVERY unresolved question now, in one round, so I answer once instead of discovering your assumptions in code later.

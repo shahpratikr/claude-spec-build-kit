@@ -13,15 +13,12 @@ Ask them as the question round says, so the build continues in this turn. Every 
 ## Step 0 - Preconditions and snapshot
 - If TASK is empty, ask for it and stop.
 - If the task is to write or update the PRD, ARCHITECTURE.md or CLAUDE.md, name the skill that owns that file (/docs-prd, /docs-arch, /docs-claudemd) and stop.
-- First action, before anything else: find the repo.
-  - Use the git toplevel of the first path the task names that sits in a repo (the plan file, a file or a folder): `git -C <dir of that path> rev-parse --show-toplevel`.
-  - If the task names no path, use the toplevel of the current folder.
-  - If neither finds a repo, ask for it as a BLOCKING question.
-- Then read `<repo>/CLAUDE.md`. Skip the Read when it is already in context as nested memory. When the repo has no CLAUDE.md, say nothing about it and go on.
+- First action, before anything else: find the repo as target-repo.md says (`--repo`, the handoff's `- Repo:`, the session, a path the task names such as the plan file, else ask as a BLOCKING question),
+  then run the guardrails setup, then read the repo's setup (target-repo.md): CLAUDE.md, rules, skills, agents, commands and settings. When the repo has none of them, say nothing about it and go on.
 - Run every git command as `git -C <repo> ...` and every test, lint and build command from `<repo>`.
 - Run `git -C <repo> branch --show-current`, `git -C <repo> log --oneline -1` and `git -C <repo> status --short`, unless the repo is the current folder and the live state above already shows them.
 - If TASK names a plan file (a `/plan-task` handoff carries `Plan: <path>`), read it by section:
-  - Handoff line: `Step N of M: <goal> - Plan: <path> - ACs: ... - Rules: ...`. The `- Rules:` part is optional, and so is a line with no step (a one-step plan).
+  - Handoff line: `Step N of M: <goal> - Plan: <path> - ACs: ... - Rules: ... - Repo: <path>`. The `- Rules:` and `- Repo:` parts are optional, and so is a line with no step (a one-step plan).
   - Grep the plan for `^#{2,3} ` to list its headings and line numbers.
   - New format (it has `## Summary`): Read Summary, Design and the named step's block (its `### Step N` heading up to the next heading) with offset and limit. Never Read the whole plan.
   - Old format (no `## Summary`): Read Brief, Design, Blast radius and the named step's row, as before.
@@ -29,14 +26,14 @@ Ask them as the question round says, so the build continues in this turn. Every 
 - Snapshot the starting state so the change can be validated without a commit. Run `git -C <repo> stash create`: it prints a hash that records the tracked files as they are now,
   without touching the working tree or index.
   BASE is that hash, or the output of `git -C <repo> rev-parse HEAD` when it prints nothing. Record BASE and the output of `git -C <repo> status --porcelain --untracked-files=all`.
-- Find commands: CLAUDE.md (Commands + Testing) first, then package scripts / Makefile / CI config. An unknown test command is a BLOCKING question. Never substitute a guess.
+- Find commands: the repo's setup first (CLAUDE.md Commands + Testing, rules, skills, settings), then package scripts / Makefile / CI config. An unknown test command is a BLOCKING question. Never substitute a guess.
   When CLAUDE.md and CI name no test command, read verification-profiles.md and ask the question with a recommended option from its table.
 
 ## Step 1 - Recon (read-only)
 1. Locate the code involved. Read the relevant functions of at least 2 sibling implementations and of their tests, not whole files (CONTEXT BUDGET).
 2. Grep for callers of everything you may change. A new-format plan has no caller list,
    so this grep is the only one: a caller outside the step's files that the change could break is in scope or a risk in the brief.
-3. Identify layering/import direction, naming and placement patterns, error-handling and logging style, public contracts touched. The invariants in CLAUDE.md bind the change.
+3. Identify layering/import direction, naming and placement patterns, error-handling and logging style, public contracts touched. The invariants and conventions in the repo's CLAUDE.md, rules, skills and agents bind the change.
 4. `git -C <repo> log -5 -- <area>`: recent changes and any earlier Task Briefs in commit bodies.
 5. If ARCHITECTURE.md exists, read the sections that cover the code you will change (CLAUDE.md, Project docs, says which).
 

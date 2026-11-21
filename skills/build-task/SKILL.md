@@ -1,7 +1,7 @@
 ---
 name: build-task
 description: Implement one task in an existing codebase end to end - recon, brief, tests first, implement, then validate with independent reviewers, fix and re-validate until clean. Never commits.
-argument-hint: "<task description | Task Brief>"
+argument-hint: "<task description | Task Brief> [--repo <path>]"
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
 hooks:
   PreToolUse:
@@ -32,7 +32,7 @@ hooks:
 ROLE: Senior engineer making one change in an existing codebase, with tests that would catch a regression. The change is done when independent reviewers find nothing left to fix, not when it compiles
 TASK: Implement: $ARGUMENTS
 CONTEXT: No PRD or architecture doc is assumed. "Done" is defined by the task text, the existing code and tests, and the Task Brief you derive.
-Build steps: @${CLAUDE_SKILL_DIR}/../../shared/build-steps.md Scenario checklist: @${CLAUDE_SKILL_DIR}/../../shared/scenario-checklist.md Validation loop: @${CLAUDE_SKILL_DIR}/../../shared/validation-loop.md
+Target repo: @${CLAUDE_SKILL_DIR}/../../shared/target-repo.md Build steps: @${CLAUDE_SKILL_DIR}/../../shared/build-steps.md Scenario checklist: @${CLAUDE_SKILL_DIR}/../../shared/scenario-checklist.md Validation loop: @${CLAUDE_SKILL_DIR}/../../shared/validation-loop.md
 Question round: @${CLAUDE_SKILL_DIR}/../../shared/question-round.md Task profile: @${CLAUDE_SKILL_DIR}/../../shared/task-profile.md
 Verification profiles: ${CLAUDE_SKILL_DIR}/../../shared/verification-profiles.md, read only when CLAUDE.md and CI name no test command
 Guardrails setup: ${CLAUDE_SKILL_DIR}/../../shared/guardrails-setup.md,
@@ -58,4 +58,4 @@ Live state (verify these render; if they appear as literal text, run the git com
 - Uncommitted: !`git status --short 2>/dev/null || echo "not a git repository"`
 
 ## Flow
-Run the guardrails setup first. Then follow the build steps (Step 0 to Step 9) with TASK = $ARGUMENTS, and print the Step 9 report.
+Start as Target repo says: find the repo, run the guardrails setup, read the repo's setup. Then follow the build steps (Step 0 to Step 9) with TASK = $ARGUMENTS, and print the Step 9 report.

@@ -1,8 +1,8 @@
 ---
 name: docs-prd
 description: Create or update docs/PRD.md - the project overview and context (purpose, users, scope, flow, constraints), with no requirements, plans or architecture
-argument-hint: "[source files or notes about the project]"
-allowed-tools: Read, Glob, Grep, Write(./docs/PRD.md), Edit(./docs/PRD.md), Bash(git log:*), Bash(git ls-files:*), Bash(git status:*)
+argument-hint: "[source files or notes about the project] [--repo <path>]"
+allowed-tools: Read, Glob, Grep, Write(./docs/PRD.md), Edit(./docs/PRD.md), Bash(git log:*), Bash(git ls-files:*), Bash(git status:*), Bash(git -C * log:*), Bash(git -C * ls-files:*), Bash(git -C * status:*)
 hooks:
   PreToolUse:
     - matcher: "Bash"
@@ -31,13 +31,13 @@ hooks:
 
 ROLE: Product engineer writing the overview a new teammate reads first: what the project is, who it is for, why it exists and where its edges are
 TASK: Create or update the project's PRD from: $ARGUMENTS
-CONTEXT: plan-task, docs-arch and docs-claudemd read the PRD as their context, so it must leave a reader able to say what the project is, who uses it, what is in and out of scope, and the constraints and terms everything else builds on. Sources of truth, in order: the user's answers; files or text named in the arguments; the code, README and existing docs; git history. Doc ownership: @${CLAUDE_SKILL_DIR}/../../shared/project-docs.md Question round: @${CLAUDE_SKILL_DIR}/../../shared/question-round.md Guardrails setup: ${CLAUDE_SKILL_DIR}/../../shared/guardrails-setup.md, read only when Glob finds no guard_bash.py in `.claude/hooks/guardrails/` under the project or in `~/.claude/hooks/guardrails/` (when it finds one, guardrails are active and nothing else is needed)
+CONTEXT: plan-task, docs-arch and docs-claudemd read the PRD as their context, so it must leave a reader able to say what the project is, who uses it, what is in and out of scope, and the constraints and terms everything else builds on. Sources of truth, in order: the user's answers; files or text named in the arguments; the code, README and existing docs; git history. Target repo: @${CLAUDE_SKILL_DIR}/../../shared/target-repo.md Doc ownership: @${CLAUDE_SKILL_DIR}/../../shared/project-docs.md Question round: @${CLAUDE_SKILL_DIR}/../../shared/question-round.md Guardrails setup: ${CLAUDE_SKILL_DIR}/../../shared/guardrails-setup.md, read only when Glob finds no guard_bash.py in `.claude/hooks/guardrails/` under the project or in `~/.claude/hooks/guardrails/` (when it finds one, guardrails are active and nothing else is needed)
 CONSTRAINTS: Write only the PRD, and only what project-docs says it owns: overview and context. No acceptance criteria, user stories, requirement ids, numeric contracts (exit-code numbers, limits, default values), command or flag lists, file paths, stack, components or directory structure. A number stays only when the user names it as a product target. Never invent: every statement traces to a source or a user answer. If a call is denied with [guardrail:...], do not retry it another way: report it.
 
 ## Step 0 - Detect
-Run the guardrails setup first.
+Start as Target repo says: find the repo, run the guardrails setup, read the repo's setup.
 1. Find the PRD (project-docs, Files). If it exists, read it: this run updates it, keeping what still holds and removing what the PRD does not own.
-2. Read ARCHITECTURE.md and CLAUDE.md if they exist, so the PRD does not repeat them.
+2. Read ARCHITECTURE.md and CLAUDE.md if they exist, so the PRD does not repeat them. The repo's skills, agents and commands are evidence of the workflows and vocabulary the project has: use them as sources, never name them, and leave commands to CLAUDE.md.
 3. Read every source named in $ARGUMENTS in full. If code exists, read the README, manifests and entry points to learn what the project does today and what is only planned.
 4. Print one line: fresh or update; code or no code; the sources read.
 

@@ -10,7 +10,7 @@ With none found and `GR_DIR` unset or `off`, the hooks let calls through, so thi
 
 ## Steps
 1. Read the `GR_DIR=` value in this skill's hooks section, `${CLAUDE_SKILL_DIR}/SKILL.md`.
-2. Use the Glob tool to look for `guard_bash.py` in `.claude/hooks/guardrails/` under the project root, then in `~/.claude/hooks/guardrails/`. If either exists, guardrails are active: skip the questions and continue the skill.
+2. Use the Glob tool to look for `guard_bash.py` in `.claude/hooks/guardrails/` under the project root, under the target repo when it is another folder (target-repo.md), then in `~/.claude/hooks/guardrails/`. If any exists, guardrails are active: skip the questions and continue the skill.
 3. If `GR_DIR` names a folder and `<folder>/guard_bash.py` exists, guardrails are active: continue the skill. If the folder has lost its scripts, the hooks are blocking every Bash call and file write, including the repair. Stop and give the user this command to run in a terminal: `python3 "${CLAUDE_SKILL_DIR}/../../shared/guardrails/configure.py" --dir "<folder>"`, or the same command with `--off` instead of `--dir "<folder>"`.
 4. If `GR_DIR` is `off`, the user declined earlier: continue the skill without asking.
 5. Otherwise ask, and do not start any of the skill's own steps until the user answers: this question is always BLOCKING, because without an answer the skill would run unguarded. Ask as the question round says, one question at a time, because b depends on a. If the picker is unavailable or returns no answer, make both questions and their options the first thing in your reply, then stop. When the user answers, apply it (step 6) and start the skill from its first step.

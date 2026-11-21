@@ -1,8 +1,8 @@
 ---
 name: docs-claudemd
 description: Generate or refresh a lean CLAUDE.md from the code, the plan file, the PRD and ARCHITECTURE.md - enough to make a change on its own (commands, test rules, conventions, invariants, constraints), pointing to the docs instead of importing them
-argument-hint: "<plan file .md>"
-allowed-tools: Read, Glob, Grep, Write(./CLAUDE.md), Edit(./CLAUDE.md), Bash(git ls-files:*), Bash(git log:*)
+argument-hint: "<plan file .md> [--repo <path>]"
+allowed-tools: Read, Glob, Grep, Write(./CLAUDE.md), Edit(./CLAUDE.md), Bash(git ls-files:*), Bash(git log:*), Bash(git -C * ls-files:*), Bash(git -C * log:*)
 hooks:
   PreToolUse:
     - matcher: "Bash"
@@ -37,10 +37,11 @@ It must be enough to make a change on its own: commands, test rules, conventions
 It imports nothing.
 An `@` import would load the whole PRD and ARCHITECTURE.md into every session, and no skill needs them on every call.
 Instead, it names them by plain path and says which section to read for what.
-Evidence priority: existing CLAUDE.md (hand-written lines) > CI config (what really runs) > package manifests / Makefile / scripts > lint, format and type configs > tests and validation code that enforce a rule > sampled code > the plan's Design section (for what is not built yet) > invariants and layering rules an existing ARCHITECTURE.md still holds > README.
+Evidence priority: existing CLAUDE.md (hand-written lines) > the repo's own `.claude` setup (rules, skills, agents, commands, settings: the commands, conventions and invariants they state) > CI config (what really runs) > package manifests / Makefile / scripts > lint, format and type configs > tests and validation code that enforce a rule > sampled code > the plan's Design section (for what is not built yet) > invariants and layering rules an existing ARCHITECTURE.md still holds > README.
+Target repo: @${CLAUDE_SKILL_DIR}/../../shared/target-repo.md
 Doc ownership: @${CLAUDE_SKILL_DIR}/../../shared/project-docs.md
 Question round: @${CLAUDE_SKILL_DIR}/../../shared/question-round.md
-Before Step 0, run the guardrails setup: ${CLAUDE_SKILL_DIR}/../../shared/guardrails-setup.md, read only when Glob finds no guard_bash.py in `.claude/hooks/guardrails/` under the project or in `~/.claude/hooks/guardrails/` (when it finds one, guardrails are active and nothing else is needed)
+Before Step 0, start as Target repo says (find the repo, run the guardrails setup, read the repo's setup). Guardrails setup: ${CLAUDE_SKILL_DIR}/../../shared/guardrails-setup.md, read only when Glob finds no guard_bash.py in `.claude/hooks/guardrails/` under the project or in `~/.claude/hooks/guardrails/` (when it finds one, guardrails are active and nothing else is needed)
 CONSTRAINTS: Include only commands, conventions Claude would otherwise get wrong, invariants and hard constraints.
 Every convention needs evidence: at least 2 code examples (file:line), one enforcing config rule, or, before the code exists, a decision in the plan.
 Every invariant names what enforces it (a test, a lint rule, validation code) or says "not enforced".
@@ -49,6 +50,7 @@ Every command must be verified, or marked planned when the code it needs does no
 No feature descriptions, rationale, or aspirations.
 Never restate what the PRD or ARCHITECTURE.md hold (product facts, structure, components, flows, interfaces, configuration, decisions): name the section instead.
 No `@` imports (project-docs rule 9).
+The repo's `.claude/rules` files load with CLAUDE.md in every session: never restate their content.
 Take decisions from the plan, never its task material, and never name the plan (project-docs rule 4).
 Target under 150 lines.
 Write only CLAUDE.md, and never a real credential into it.
